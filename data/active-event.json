@@ -1,0 +1,172 @@
+{
+  "event_name":    "Gulf Pharma Connect 2026",
+  "event_edition": "5th Annual",
+  "dates":         "14–15 October 2026",
+  "organiser":     "TVCO — True Value Conferences Organizing",
+
+  "persona": {
+    "name":     "Nour",
+    "greeting": "Welcome to Gulf Pharma Connect 2026. I am Nour, your AI concierge. How can I help you today?",
+    "language": "en",
+    "tone":     "friendly, clear, and professional"
+  },
+
+  "venue": {
+    "name":              "Conrad Dubai",
+    "address":           "Sheikh Zayed Road",
+    "city":              "Dubai, UAE",
+    "wifi_network":      "GulfPharma2026",
+    "wifi_password":     "Connect2026",
+    "registration_desk": "Grand Foyer, ground floor — open from 07:30 Day 1 and 08:00 Day 2",
+    "prayer_room":       "Level 2, Room 210 — available all day",
+    "parking":           "Valet at the main hotel entrance, complimentary for delegates",
+    "emergency_number":  "+971 50 123 4567"
+  },
+
+  "schedule": [
+    {
+      "day":  1,
+      "date": "Tuesday 14 October 2026",
+      "sessions": [
+        { "time": "08:00–09:00", "title": "Registration & welcome coffee",          "room": "Grand Foyer" },
+        { "time": "09:00–09:30", "title": "Opening keynote — Innovation in Pharma", "room": "Ballroom A",  "speaker": "Dr. Sarah Al-Mansouri" },
+        { "time": "09:30–11:00", "title": "Panel: Market Access in the GCC",        "room": "Ballroom A" },
+        { "time": "11:00–11:20", "title": "Coffee break",                           "room": "Foyer" },
+        { "time": "11:20–13:00", "title": "Workshop: Digital Health Adoption",       "room": "Room 4" },
+        { "time": "13:00–14:00", "title": "Networking lunch",                       "room": "Garden Hall" },
+        { "time": "14:00–15:30", "title": "Symposium: Oncology Pipeline Updates",   "room": "Ballroom A" },
+        { "time": "15:30–15:50", "title": "Coffee break",                           "room": "Foyer" },
+        { "time": "15:50–17:30", "title": "Breakout sessions",                      "room": "Rooms 1–5" },
+        { "time": "19:00–22:00", "title": "Gala dinner & awards",                   "room": "Rooftop" }
+      ]
+    },
+    {
+      "day":  2,
+      "date": "Wednesday 15 October 2026",
+      "sessions": [
+        { "time": "08:30–09:00", "title": "Morning coffee",                              "room": "Grand Foyer" },
+        { "time": "09:00–10:30", "title": "Keynote: AI in Clinical Trials",             "room": "Ballroom A",  "speaker": "Prof. James Chen" },
+        { "time": "10:30–12:00", "title": "Panel: Regulatory Updates KSA & UAE",        "room": "Ballroom A" },
+        { "time": "12:00–13:00", "title": "Lunch",                                      "room": "Garden Hall" },
+        { "time": "13:00–14:30", "title": "Workshop: Patient Engagement Strategies",    "room": "Room 4" },
+        { "time": "14:30–15:00", "title": "Closing remarks & next steps",               "room": "Ballroom A" }
+      ]
+    }
+  ],
+
+  "speakers": [
+    {
+      "name":        "Dr. Sarah Al-Mansouri",
+      "title":       "Head of Medical Affairs",
+      "affiliation": "Sanofi GCC",
+      "session":     "Opening keynote Day 1"
+    },
+    {
+      "name":        "Prof. James Chen",
+      "title":       "Clinical Research Director",
+      "affiliation": "AstraZeneca",
+      "session":     "Keynote Day 2"
+    },
+    {
+      "name":        "Dr. Fatima Al-Rashid",
+      "title":       "VP Regulatory Affairs",
+      "affiliation": "GSK MENA"
+    },
+    {
+      "name":        "Mr. Ahmed Khalil",
+      "title":       "Chief Digital Officer",
+      "affiliation": "Dubai Health Authority"
+    },
+    {
+      "name":        "Dr. Rania Mostafa",
+      "title":       "Oncology Lead",
+      "affiliation": "Pfizer Egypt & Levant"
+    }
+  ],
+
+  "transport": {
+    "airport_shuttle": "Shuttle from Dubai International Terminals 1 & 3 at 06:00, 08:00, and 10:00 on Day 1. Return at 07:00 on Day 2. Contact the transport desk in the Foyer for changes.",
+    "hotel_shuttle":   "Every 30 minutes between Conrad Dubai and DIFC Metro station.",
+    "taxi_note":       "Hotel concierge can arrange taxis. Estimated fare to DXB airport is AED 80–100."
+  },
+
+  "meals": {
+    "included": true,
+    "halal":    true,
+    "options":  ["halal", "vegetarian", "vegan", "gluten-free"],
+    "note":     "All dietary options are labelled at every station. Notify the registration desk for severe allergies."
+  },
+
+  "drugs": [
+    {
+      "brand_name":        "Cardivex",
+      "generic_name":      "atorvastatin calcium extended-release",
+      "manufacturer":      "Sanofi GCC",
+      "therapeutic_area":  "Cardiovascular — Lipid Management",
+      "approved_indication": "Cardivex is approved for the management of primary hypercholesterolaemia and mixed dyslipidaemia in adult patients.",
+      "key_facts": [
+        "Once-daily oral tablet available in 20 mg, 40 mg, and 80 mg strengths.",
+        "Extended-release formulation designed for consistent 24-hour lipid control.",
+        "Registered and available in UAE, KSA, Egypt, and Kuwait.",
+        "Featured in the Day 1 symposium: Oncology Pipeline Updates — cardiovascular co-morbidities session."
+      ],
+      "faqs": [
+        {
+          "question": "What is Cardivex used for?",
+          "answer":   "Cardivex is approved for the management of elevated cholesterol and mixed lipid disorders in adult patients. For clinical details, please speak to a medical representative."
+        },
+        {
+          "question": "Which countries is Cardivex available in?",
+          "answer":   "Cardivex is currently registered and available in the UAE, Saudi Arabia, Egypt, and Kuwait."
+        },
+        {
+          "question": "What strengths does Cardivex come in?",
+          "answer":   "Cardivex is available as a once-daily oral tablet in 20 mg, 40 mg, and 80 mg strengths."
+        },
+        {
+          "question": "Who is presenting Cardivex data at this event?",
+          "answer":   "Cardivex data is being discussed in the Day 1 symposium on cardiovascular co-morbidities. Dr. Rania Mostafa from Pfizer is presenting in the same session."
+        }
+      ],
+      "blocked_topics": [
+        "dosage recommendation",
+        "dose adjustment",
+        "side effect",
+        "adverse event",
+        "drug interaction",
+        "contraindication",
+        "off-label",
+        "clinical trial result",
+        "prescribing",
+        "safety profile"
+      ]
+    }
+  ],
+
+  "faqs": [
+    {
+      "question": "Where do I collect my badge?",
+      "answer":   "Registration desk in the Grand Foyer, ground floor — open from 07:30 on Day 1 and 08:00 on Day 2."
+    },
+    {
+      "question": "Is there a dress code?",
+      "answer":   "Business professional is recommended. The gala dinner on Day 1 evening is black-tie optional."
+    },
+    {
+      "question": "Can I get a certificate of attendance?",
+      "answer":   "Yes — email certificates are issued within 5 business days. Request at the registration desk."
+    },
+    {
+      "question": "Are there CPD credits?",
+      "answer":   "Yes — 8 CPD credits over two days. Confirm your attendance at the registration desk each day."
+    },
+    {
+      "question": "Where can I access the presentations after the event?",
+      "answer":   "Slides shared with consent will be emailed to all registered delegates within 2 weeks."
+    },
+    {
+      "question": "What is the Wi-Fi password?",
+      "answer":   "Network: GulfPharma2026 — Password: Connect2026"
+    }
+  ]
+}
