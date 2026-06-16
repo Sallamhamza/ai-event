@@ -1,11 +1,11 @@
 "use client";
 
 // components/AvatarStream.tsx
-// D-ID Agent WebRTC manager.
+// D-ID WebRTC manager for image/presenter streams.
 // All visuals delegated to <HologramAvatar>.
 // This component owns:
 //   • the <video> element (via videoRef)
-//   • the WebRTC / D-ID agent session lifecycle
+//   • the WebRTC / D-ID stream session lifecycle
 //   • the speak/stop API calls
 //   • browser-TTS fallback when D-ID stream is unavailable
 
@@ -71,7 +71,7 @@ export default function AvatarStream({
 
   const updateState = useCallback((s: AvatarState) => onStateChange?.(s), [onStateChange]);
 
-  // ── speak: D-ID /chat first, browser TTS as fallback ────────────────────────
+  // ── speak: D-ID stream first, browser TTS as fallback ───────────────────────
   const didSpeak = useCallback(async (text: string) => {
     if (streamIdRef.current && sessionIdRef.current) {
       try {
@@ -82,7 +82,7 @@ export default function AvatarStream({
           video.play().catch(() => {});
         }
 
-        const res = await fetch("/api/did-agent/talk", {
+        const res = await fetch("/api/did-stream/talk", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({ streamId: streamIdRef.current, sessionId: sessionIdRef.current, text }),
@@ -104,7 +104,7 @@ export default function AvatarStream({
   const didStop = useCallback(async () => {
     window.speechSynthesis?.cancel();
     if (!streamIdRef.current) return;
-    await fetch("/api/did-agent/close", {
+    await fetch("/api/did-stream/close", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ streamId: streamIdRef.current, sessionId: sessionIdRef.current }),
@@ -119,7 +119,7 @@ export default function AvatarStream({
 
     function closeSession() {
       if (streamIdRef.current) {
-        fetch("/api/did-agent/close", {
+        fetch("/api/did-stream/close", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({ streamId: streamIdRef.current, sessionId: sessionIdRef.current }),
@@ -148,8 +148,8 @@ export default function AvatarStream({
     async function init() {
       setIsConnecting(true);
       try {
-        // 1. Create D-ID Agent stream
-        const res     = await fetch("/api/did-agent/stream", { method: "POST" });
+        // 1. Create D-ID presenter stream from DID_PRESENTER_URL
+        const res     = await fetch("/api/did-stream", { method: "POST" });
         const session = await res.json();
         const offer = session.offer ?? session.jsep;
         if (!res.ok || !session.id || !offer) {
@@ -190,7 +190,7 @@ export default function AvatarStream({
         // 5. Relay ICE candidates
         pc.onicecandidate = (e) => {
           if (!e.candidate || !streamIdRef.current) return;
-          fetch("/api/did-agent/ice", {
+          fetch("/api/did-stream/ice", {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
             body:    JSON.stringify({
@@ -208,7 +208,7 @@ export default function AvatarStream({
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
-        const sdpRes = await fetch("/api/did-agent/sdp", {
+        const sdpRes = await fetch("/api/did-stream/sdp", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
           body:    JSON.stringify({
@@ -240,7 +240,7 @@ export default function AvatarStream({
 
     function onUnload() {
       if (streamIdRef.current)
-        navigator.sendBeacon("/api/did-agent/close",
+        navigator.sendBeacon("/api/did-stream/close",
           JSON.stringify({ streamId: streamIdRef.current, sessionId: sessionIdRef.current }));
     }
 

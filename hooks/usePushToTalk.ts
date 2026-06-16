@@ -3,8 +3,8 @@
 // hooks/usePushToTalk.ts
 // Full push-to-talk lifecycle:
 //   hold button / space bar → Web Speech API recording
-//   release                 → POST transcript to /api/did-agent/ask (D-ID agent LLM)
-//   answer received         → avatar.speak(answer)  [D-ID animation or browser TTS]
+//   release                 → POST transcript to /api/ask
+//   answer received         → avatar.speak(answer)  [D-ID stream or browser TTS]
 
 import { useRef, useState, useCallback } from "react";
 import type { DIDAvatar } from "@/components/AvatarStream";
@@ -18,13 +18,11 @@ export type PTTStatus =
 
 interface UsePushToTalkOptions {
   avatar:      DIDAvatar | null;
-  streamId?:   string | null;    // D-ID stream ID for agent ask endpoint
-  sessionId?:  string | null;    // D-ID session ID for agent ask endpoint
   onTranscript?: (text: string) => void;
   onAnswer?:     (text: string) => void;
 }
 
-export function usePushToTalk({ avatar, streamId, sessionId, onTranscript, onAnswer }: UsePushToTalkOptions) {
+export function usePushToTalk({ avatar, onTranscript, onAnswer }: UsePushToTalkOptions) {
   const [status, setStatus] = useState<PTTStatus>("idle");
   const [liveTranscript, setLiveTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -97,28 +95,13 @@ export function usePushToTalk({ avatar, streamId, sessionId, onTranscript, onAns
     setStatus("thinking");
 
     try {
-      // Try D-ID agent's built-in LLM first (has event knowledge base, no Gemini quota needed)
-      // Falls back to /api/ask if D-ID agent is unreachable
-      let answer = "";
-      try {
-        const agentRes = await fetch("/api/did-agent/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: transcript, streamId, sessionId }),
-        });
-        const agentData = await agentRes.json();
-        if (agentData.answer) answer = agentData.answer;
-      } catch { /* fall through to /api/ask */ }
-
-      if (!answer) {
-        const res = await fetch("/api/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: transcript }),
-        });
-        const data = await res.json();
-        answer = data.answer ?? "Sorry, I couldn't get an answer. Please try again.";
-      }
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: transcript }),
+      });
+      const data = await res.json();
+      const answer = data.answer ?? "Sorry, I couldn't get an answer. Please try again.";
       onAnswer?.(answer);
 
       setStatus("speaking");
@@ -160,7 +143,7 @@ export function usePushToTalk({ avatar, streamId, sessionId, onTranscript, onAns
     }
 
     setLiveTranscript("");
-  }, [status, liveTranscript, avatar, streamId, sessionId, onTranscript, onAnswer]);
+  }, [status, liveTranscript, avatar, onTranscript, onAnswer]);
 
   // ── Reset error ─────────────────────────────────────────────────────────────
   const reset = useCallback(() => {

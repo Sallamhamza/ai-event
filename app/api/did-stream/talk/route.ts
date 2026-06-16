@@ -29,7 +29,7 @@ export async function POST(req: Request) {
           input: text,
           provider: {
             type: "microsoft",
-            voice_id: "en-US-JennyNeural",
+            voice_id: process.env.DID_VOICE_ID?.trim() || "en-US-GuyNeural",
           },
         },
         config: { stitch: true },

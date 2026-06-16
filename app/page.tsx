@@ -8,21 +8,17 @@ import { usePushToTalk } from "@/hooks/usePushToTalk";
 export default function KioskPage() {
   const [avatar, setAvatar] = useState<DIDAvatar | null>(null);
   const [streamId, setStreamId] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
   const [transcript, setTranscript] = useState("");
   const [answer, setAnswer] = useState("");
 
-  const handleAvatarReady = useCallback((av: DIDAvatar, sid?: string, sessId?: string) => {
+  const handleAvatarReady = useCallback((av: DIDAvatar, sid?: string) => {
     setAvatar(av);
     if (sid) setStreamId(sid);
-    if (sessId) setSessionId(sessId);
   }, []);
 
   const { status, liveTranscript, error, startListening, stopListening, reset } =
     usePushToTalk({
       avatar,
-      streamId,
-      sessionId,
       onTranscript: (text) => {
         setTranscript(text);
         setAnswer("");
