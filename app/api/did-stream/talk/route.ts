@@ -1,7 +1,7 @@
 // app/api/did-stream/talk/route.ts
 // Sends a text script to D-ID to make the streaming avatar speak.
 
-import { detectLanguageFromText } from "@/lib/language";
+import { resolveDidSpeech } from "@/lib/did-voice";
 
 const DID_API = "https://api.d-id.com";
 
@@ -15,17 +15,13 @@ export async function POST(req: Request) {
   try {
     const { streamId, sessionId, text, language } = await req.json();
     const fallbackLang = language === "ar" ? "ar" : "en";
-    const lang = detectLanguageFromText(String(text ?? ""), fallbackLang);
+    const speech = resolveDidSpeech(String(text ?? ""), fallbackLang);
 
     if (!streamId || !text) {
       return Response.json({ error: "Missing streamId or text" }, { status: 400 });
     }
 
     // Male voices: English = GuyNeural, Arabic = HamedNeural
-    const voiceId = lang === "ar"
-      ? (process.env.DID_VOICE_ID_AR?.trim() || "ar-SA-HamedNeural")
-      : (process.env.DID_VOICE_ID?.trim()    || "en-US-GuyNeural");
-
     const res = await fetch(`${DID_API}/talks/streams/${streamId}`, {
       method: "POST",
       headers: {
@@ -36,7 +32,7 @@ export async function POST(req: Request) {
         script: {
           type:     "text",
           input:    text,
-          provider: { type: "microsoft", voice_id: voiceId },
+          provider: { type: "microsoft", voice_id: speech.voiceId },
         },
         config:     { stitch: true },
         session_id: sessionId,
@@ -49,7 +45,7 @@ export async function POST(req: Request) {
       return Response.json({ error: "Talk request failed", details: data }, { status: res.status });
     }
 
-    return Response.json({ ok: true, language: lang, voice_id: voiceId });
+    return Response.json({ ok: true, language: speech.language, voice_id: speech.voiceId });
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 });
   }
