@@ -26,6 +26,7 @@ export default function KioskPage() {
         setAnswer("");
       },
       onAnswer: setAnswer,
+      onLanguageResolved: setLang,
     });
 
   const displayTranscript = liveTranscript || transcript;
@@ -530,9 +531,11 @@ export default function KioskPage() {
             </div>
             <div className="top-actions">
               <button
-                className={`icon-button lang-toggle`}
+                className="icon-button lang-toggle"
                 type="button"
-                aria-label="Toggle language Arabic / English"
+                aria-label={`Current language: ${lang === "ar" ? "Arabic" : "English"}. Toggle language.`}
+                aria-pressed={lang === "ar"}
+                title={lang === "ar" ? "Arabic selected" : "English selected"}
                 onClick={() => setLang(l => l === "en" ? "ar" : "en")}
                 style={{
                   fontSize: "11px", fontWeight: 700,
@@ -547,7 +550,7 @@ export default function KioskPage() {
                   minWidth: 44,
                 }}
               >
-                {lang === "en" ? "عربي" : "EN"}
+                {lang === "ar" ? "AR" : "EN"}
               </button>
               <button
                 className="icon-button icon-button--mute"
@@ -577,12 +580,14 @@ export default function KioskPage() {
           <section className="conversation" aria-live="polite" aria-label="Conversation">
             <div className="bubble bubble-user">
               <span className="bubble-label">{lang === "ar" ? "أنت" : "You"}</span>
-              <p>{displayTranscript || (lang === "ar" ? "ما هي أبرز مميزات هذه الفعالية؟" : "What are the main highlights of this event?")}</p>
+              <p dir={lang === "ar" ? "rtl" : "ltr"}>
+                {displayTranscript || (lang === "ar" ? "ما هي أبرز مميزات هذه الفعالية؟" : "What are the main highlights of this event?")}
+              </p>
             </div>
 
             <div className="bubble bubble-aivent">
               <span className="bubble-label">Aivent</span>
-              <p>{assistantCopy}</p>
+              <p dir={lang === "ar" ? "rtl" : "ltr"}>{assistantCopy}</p>
             </div>
           </section>
 

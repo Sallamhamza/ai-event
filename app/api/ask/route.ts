@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   buildActiveEventSystemPrompt,
+  containsArabicText,
   getActiveEventMockAnswer,
   getActiveEventRestrictedAnswer,
   loadActiveEventKnowledge,
@@ -38,6 +39,50 @@ function safeMockAnswer(
       ? "أواجه مشكلة تقنية مؤقتة، لكن فريق الفعالية في مكتب المعلومات يمكنه مساعدتك فورًا."
       : "I am having a temporary technical issue, but the event team at the information desk can help you right away.";
   }
+}
+
+function buildUserPrompt(question: string, language: ConciergeLanguage): string {
+  if (language === "ar") {
+    return [
+      "أجب باللغة العربية فقط.",
+      "استخدم الإنجليزية فقط لأسماء القاعات أو العلامات التجارية أو الاختصارات الرسمية مثل Ballroom A أو CPD.",
+      "إذا لم تكن المعلومة موجودة في JSON الفعالية، قل ذلك بالعربية ووجّه الزائر إلى مكتب المعلومات.",
+      "",
+      `سؤال الزائر: ${question}`,
+    ].join("\n");
+  }
+
+  return [
+    "Answer in English only.",
+    "Use only the active event JSON from the system instructions.",
+    "",
+    `Delegate question: ${question}`,
+  ].join("\n");
+}
+
+function enforceAnswerLanguage(
+  answer: string,
+  question: string,
+  language: ConciergeLanguage,
+  knowledge: ActiveEventKnowledge
+): { answer: string; fallback: boolean } {
+  const trimmed = answer.trim();
+  if (!trimmed) {
+    return {
+      answer: getActiveEventMockAnswer(question, language, knowledge),
+      fallback: true,
+    };
+  }
+
+  if (language === "ar" && !containsArabicText(trimmed)) {
+    console.warn("Gemini returned a non-Arabic answer for an Arabic request; using active-event Arabic fallback.");
+    return {
+      answer: getActiveEventMockAnswer(question, "ar", knowledge),
+      fallback: true,
+    };
+  }
+
+  return { answer: trimmed, fallback: false };
 }
 
 export async function POST(request: Request) {
@@ -99,12 +144,19 @@ export async function POST(request: Request) {
       systemInstruction: buildActiveEventSystemPrompt(knowledge, language),
     });
 
-    const result = await model.generateContent(question);
+    const result = await model.generateContent(buildUserPrompt(question, language));
+    const checkedAnswer = enforceAnswerLanguage(
+      result.response.text(),
+      question,
+      language,
+      knowledge
+    );
 
     return jsonAnswer({
-      answer: result.response.text(),
+      answer: checkedAnswer.answer,
       language,
       refused: false,
+      fallback: checkedAnswer.fallback || undefined,
     });
   } catch (error: unknown) {
     console.error("Ask route error:", error);

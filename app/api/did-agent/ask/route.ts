@@ -3,6 +3,9 @@
 // The frontend then sends that text to the active stream via /api/did-agent/talk.
 
 const DID_API = "https://api.d-id.com";
+const ARABIC_TEXT = /[\u0600-\u06ff]/;
+
+type ConciergeLanguage = "en" | "ar";
 
 function authHeader() {
   const key = process.env.DID_API_KEY?.trim();
@@ -10,16 +13,24 @@ function authHeader() {
   return `Basic ${key}`;
 }
 
+function resolveLanguage(question: string, language: unknown): ConciergeLanguage {
+  return language === "ar" || ARABIC_TEXT.test(question) ? "ar" : "en";
+}
+
 export async function POST(req: Request) {
+  let resolvedLanguage: ConciergeLanguage = "en";
   try {
     const { question, language } = await req.json();
     if (typeof question !== "string" || !question.trim()) {
       return Response.json({ error: "Missing question" }, { status: 400 });
     }
+    resolvedLanguage = resolveLanguage(question, language);
+
     const agentId = process.env.DID_AGENT_ID?.trim();
     if (!agentId) {
       return Response.json({
-        answer: getLocalAnswer(question, language ?? "en"),
+        answer: getLocalAnswer(question, resolvedLanguage),
+        language: resolvedLanguage,
         refused: false,
         fallback: true,
       });
@@ -33,10 +44,10 @@ export async function POST(req: Request) {
     ];
     const q = question.toLowerCase();
     if (blocked.some(t => q.includes(t))) {
-      const refusal = language === "ar"
+      const refusal = resolvedLanguage === "ar"
         ? "عذرًا، يمكنني فقط الإجابة عن أسئلة تنظيمية خاصة بالفعالية. للأسئلة الطبية يرجى التوجه إلى الممثل الطبي المختص."
         : "Sorry, I can only answer event logistics questions. For medical or product questions, please speak with a medical representative.";
-      return Response.json({ answer: refusal, refused: true });
+      return Response.json({ answer: refusal, language: resolvedLanguage, refused: true });
     }
 
     const createChatRes = await fetch(`${DID_API}/agents/${agentId}/chat`, {
@@ -58,7 +69,7 @@ export async function POST(req: Request) {
     if (!createChatRes.ok || !chatId) {
       console.error("D-ID create chat error:", createChatData);
       return Response.json(
-        { answer: getLocalAnswer(question, language ?? "en"), refused: false, fallback: true },
+        { answer: getLocalAnswer(question, resolvedLanguage), language: resolvedLanguage, refused: false, fallback: true },
         { status: 200 }
       );
     }
@@ -85,7 +96,7 @@ export async function POST(req: Request) {
     if (!res.ok) {
       console.error("D-ID agent chat message error:", data);
       return Response.json(
-        { answer: getLocalAnswer(question, language ?? "en"), refused: false, fallback: true },
+        { answer: getLocalAnswer(question, resolvedLanguage), language: resolvedLanguage, refused: false, fallback: true },
         { status: 200 }
       );
     }
@@ -97,15 +108,26 @@ export async function POST(req: Request) {
       data?.messages?.[0]?.content ??
       "";
 
-    const answer = agentAnswer.trim() || getLocalAnswer(question, language ?? "en");
+    const answer = agentAnswer.trim() || getLocalAnswer(question, resolvedLanguage);
+    if (resolvedLanguage === "ar" && !ARABIC_TEXT.test(answer)) {
+      return Response.json({
+        answer: getLocalAnswer(question, resolvedLanguage),
+        language: resolvedLanguage,
+        refused: false,
+        fallback: true,
+      });
+    }
 
-    return Response.json({ answer, refused: false, source: "did-agent" });
+    return Response.json({ answer, language: resolvedLanguage, refused: false, source: "did-agent" });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("D-ID ask route error:", msg);
     // Emergency fallback to local answers
     return Response.json({
-      answer: "I'm having a moment — please try again.",
+      answer: resolvedLanguage === "ar"
+        ? "أواجه مشكلة تقنية مؤقتة، يرجى المحاولة مرة أخرى."
+        : "I'm having a moment — please try again.",
+      language: resolvedLanguage,
       refused: false,
       fallback: true,
     }, { status: 200 });

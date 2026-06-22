@@ -152,8 +152,12 @@ export function loadActiveEventKnowledge(): ActiveEventKnowledge {
   return JSON.parse(raw) as ActiveEventKnowledge;
 }
 
+export function containsArabicText(value: string): boolean {
+  return ARABIC_RE.test(value);
+}
+
 export function resolveLanguage(question: string, language: ConciergeLanguage): ConciergeLanguage {
-  return language === "ar" || ARABIC_RE.test(question) ? "ar" : "en";
+  return language === "ar" || containsArabicText(question) ? "ar" : "en";
 }
 
 export function getActiveEventRestrictedAnswer(

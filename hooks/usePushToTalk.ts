@@ -5,7 +5,7 @@
 //   hold button / space bar → Web Speech API recording
 //   release                 → POST to /api/ask with language → speak answer in same language
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import type { DIDAvatar } from "@/components/AvatarStream";
 
 // ── Female voice blocklist (works on iOS/Android/Windows) ──────────────────────────
@@ -35,15 +35,27 @@ interface UsePushToTalkOptions {
   language?:    ConciergeLanguage;        // set from parent language toggle
   onTranscript?: (text: string) => void;
   onAnswer?:     (text: string) => void;
+  onLanguageResolved?: (language: ConciergeLanguage) => void;
 }
 
-export function usePushToTalk({ avatar, language = "en", onTranscript, onAnswer }: UsePushToTalkOptions) {
+export function usePushToTalk({
+  avatar,
+  language = "en",
+  onTranscript,
+  onAnswer,
+  onLanguageResolved,
+}: UsePushToTalkOptions) {
   const [status, setStatus] = useState<PTTStatus>("idle");
   const [liveTranscript, setLiveTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const finalTranscriptRef = useRef("");
+  const languageRef = useRef<ConciergeLanguage>(language);
+
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
 
   // ── Start recording ─────────────────────────────────────────────────────────
   const startListening = useCallback(() => {
@@ -60,7 +72,8 @@ export function usePushToTalk({ avatar, language = "en", onTranscript, onAnswer 
     }
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.lang           = language === "ar" ? "ar-SA" : "en-US";
+    const recognitionLanguage = languageRef.current;
+    recognition.lang           = recognitionLanguage === "ar" ? "ar-SA" : "en-US";
     recognition.continuous     = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
@@ -90,7 +103,7 @@ export function usePushToTalk({ avatar, language = "en", onTranscript, onAnswer 
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [status, language]);
+  }, [status]);
 
   // ── Stop recording, send to Gemini, speak answer ────────────────────────────
   const stopListening = useCallback(async () => {
@@ -109,8 +122,9 @@ export function usePushToTalk({ avatar, language = "en", onTranscript, onAnswer 
     onTranscript?.(transcript);
     setStatus("thinking");
 
-    // language comes from the prop (set by toggle in page.tsx)
-    const requestLang = language;
+    // The toggle sets the preferred language. Arabic transcript text always wins.
+    const requestLang = resolveSpeechLanguage(transcript, languageRef.current);
+    onLanguageResolved?.(requestLang);
 
     try {
       const res = await fetch("/api/ask", {
@@ -124,6 +138,7 @@ export function usePushToTalk({ avatar, language = "en", onTranscript, onAnswer 
         answer,
         data.language === "ar" ? "ar" : requestLang
       );
+      onLanguageResolved?.(speechLang);
       onAnswer?.(answer);
 
       setStatus("speaking");
@@ -177,7 +192,7 @@ export function usePushToTalk({ avatar, language = "en", onTranscript, onAnswer 
     }
 
     setLiveTranscript("");
-  }, [status, liveTranscript, avatar, language, onTranscript, onAnswer]);
+  }, [status, liveTranscript, avatar, onTranscript, onAnswer, onLanguageResolved]);
 
   // ── Reset error ─────────────────────────────────────────────────────────────
   const reset = useCallback(() => {
