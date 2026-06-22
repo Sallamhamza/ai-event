@@ -29,6 +29,11 @@ interface AvatarStreamProps {
 }
 
 const AGENT_PORTRAIT = "/male-avatar-hologram.png";
+const ARABIC_TEXT = /[\u0600-\u06ff]/;
+
+function resolveSpeechLanguage(text: string, preferred: "en" | "ar" = "en"): "en" | "ar" {
+  return preferred === "ar" || ARABIC_TEXT.test(text) ? "ar" : "en";
+}
 
 // ── Browser TTS — male English / native Arabic ───────────────────────────────
 // Strategy for male English: filter OUT known female voices (works on iOS/Android/Windows)
@@ -40,12 +45,15 @@ function browserSpeak(text: string, lang: "en" | "ar" = "en"): Promise<void> {
     window.speechSynthesis?.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis?.getVoices() ?? [];
+    const speechLang = resolveSpeechLanguage(text, lang);
 
-    if (lang === "ar") {
+    if (speechLang === "ar") {
       utter.lang  = "ar-SA";
       utter.rate  = 0.88;
       utter.pitch = 1.0;
-      const arVoice = voices.find(v => v.lang.startsWith("ar"));
+      const arVoice =
+        voices.find(v => v.lang === "ar-SA") ??
+        voices.find(v => v.lang.startsWith("ar"));
       if (arVoice) utter.voice = arVoice;
     } else {
       utter.lang  = "en-US";
@@ -87,6 +95,7 @@ export default function AvatarStream({
 
   // ── speak: D-ID stream first, browser TTS as fallback ───────────────────────
   const didSpeak = useCallback(async (text: string, lang: "en" | "ar" = "en") => {
+    const speechLang = resolveSpeechLanguage(text, lang);
     if (streamIdRef.current && sessionIdRef.current) {
       try {
         const res = await fetch("/api/did-stream/talk", {
@@ -96,13 +105,13 @@ export default function AvatarStream({
             streamId:  streamIdRef.current,
             sessionId: sessionIdRef.current,
             text,
-            language:  lang,
+            language:  speechLang,
           }),
         });
         if (res.ok) return;                // D-ID replied — video will animate
       } catch { /* fall through to TTS */ }
     }
-    await browserSpeak(text, lang);
+    await browserSpeak(text, speechLang);
   }, []);
 
   const didStop = useCallback(async () => {

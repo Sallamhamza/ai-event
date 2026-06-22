@@ -2,6 +2,7 @@
 // Sends a text script to D-ID to make the streaming avatar speak.
 
 const DID_API = "https://api.d-id.com";
+const ARABIC_TEXT = /[\u0600-\u06ff]/;
 
 function authHeader() {
   const key = process.env.DID_API_KEY?.trim();
@@ -12,7 +13,7 @@ function authHeader() {
 export async function POST(req: Request) {
   try {
     const { streamId, sessionId, text, language } = await req.json();
-    const lang = language === "ar" ? "ar" : "en";
+    const lang = language === "ar" || ARABIC_TEXT.test(String(text ?? "")) ? "ar" : "en";
 
     if (!streamId || !text) {
       return Response.json({ error: "Missing streamId or text" }, { status: 400 });

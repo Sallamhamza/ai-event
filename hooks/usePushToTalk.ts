@@ -22,10 +22,17 @@ const getVoices = () =>
   _cachedVoices.length ? _cachedVoices : (window.speechSynthesis?.getVoices() ?? []);
 
 export type PTTStatus = "idle" | "listening" | "thinking" | "speaking" | "error";
+type ConciergeLanguage = "en" | "ar";
+
+const ARABIC_TEXT = /[\u0600-\u06ff]/;
+
+function resolveSpeechLanguage(text: string, preferred: ConciergeLanguage): ConciergeLanguage {
+  return preferred === "ar" || ARABIC_TEXT.test(text) ? "ar" : "en";
+}
 
 interface UsePushToTalkOptions {
   avatar?:      DIDAvatar | null;
-  language?:    "en" | "ar";        // set from parent language toggle
+  language?:    ConciergeLanguage;        // set from parent language toggle
   onTranscript?: (text: string) => void;
   onAnswer?:     (text: string) => void;
 }
@@ -103,16 +110,20 @@ export function usePushToTalk({ avatar, language = "en", onTranscript, onAnswer 
     setStatus("thinking");
 
     // language comes from the prop (set by toggle in page.tsx)
-    const lang = language;
+    const requestLang = language;
 
     try {
       const res = await fetch("/api/ask", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ question: transcript, language: lang }),
+        body:    JSON.stringify({ question: transcript, language: requestLang }),
       });
       const data   = await res.json();
       const answer = data.answer ?? "Sorry, I couldn't get an answer. Please try again.";
+      const speechLang = resolveSpeechLanguage(
+        answer,
+        data.language === "ar" ? "ar" : requestLang
+      );
       onAnswer?.(answer);
 
       setStatus("speaking");
@@ -123,11 +134,13 @@ export function usePushToTalk({ avatar, language = "en", onTranscript, onAnswer 
           const utter  = new SpeechSynthesisUtterance(text);
           const voices = getVoices();
 
-          if (lang === "ar") {
+          if (speechLang === "ar") {
             utter.lang  = "ar-SA";
             utter.rate  = 0.88;
             utter.pitch = 1.0;
-            const arVoice = voices.find(v => v.lang.startsWith("ar"));
+            const arVoice =
+              voices.find(v => v.lang === "ar-SA") ??
+              voices.find(v => v.lang.startsWith("ar"));
             if (arVoice) utter.voice = arVoice;
           } else {
             utter.lang  = "en-US";
@@ -148,7 +161,7 @@ export function usePushToTalk({ avatar, language = "en", onTranscript, onAnswer 
 
       if (avatar) {
         try {
-          await avatar.speak(answer, lang);
+          await avatar.speak(answer, speechLang);
         } catch {
           await speakViaTTS(answer);
         }

@@ -258,6 +258,86 @@
 "answer_ar": "نعم، سيتم إرسال شهادات الحضور عبر البريد الإلكتروني خلال 5 أيام عمل. يرجى التأكد من صحة بريدك الإلكتروني لدى مكتب التسجيل."
 },
 {
+"intent": "opening_keynote",
+"examples": [
+"What time is the opening keynote?",
+"When does the opening keynote start?",
+"متى تبدأ المحاضرة الافتتاحية؟"
+],
+"answer_en": "The opening keynote starts at 09:00 in Ballroom A. Delegates should collect their badge first and be seated a few minutes before the session begins.",
+"answer_ar": "تبدأ المحاضرة الافتتاحية الساعة 09:00 في Ballroom A. يُفضّل استلام البطاقة أولًا والوصول إلى القاعة قبل بدء الجلسة بدقائق."
+},
+{
+"intent": "day_two_speaker",
+"examples": [
+"Who is speaking on Day 2?",
+"Who is the Day 2 keynote speaker?",
+"من هو المتحدث في اليوم الثاني؟"
+],
+"answer_en": "Day 2 opens at 09:00 in Ballroom A with the AI in Clinical Trials keynote. For the final confirmed speaker name, please check the printed agenda or ask the information desk.",
+"answer_ar": "يفتتح اليوم الثاني الساعة 09:00 في Ballroom A بمحاضرة عن الذكاء الاصطناعي في التجارب السريرية. لمعرفة اسم المتحدث النهائي المؤكد، يرجى مراجعة جدول الفعالية أو مكتب المعلومات."
+},
+{
+"intent": "ballroom_a_location",
+"examples": [
+"Where is Ballroom A?",
+"How do I get to Ballroom A?",
+"أين تقع قاعة Ballroom A؟"
+],
+"answer_en": "Ballroom A is directly ahead from the registration desk, just past the welcome coffee area. Event staff will be positioned near the entrance.",
+"answer_ar": "تقع Ballroom A أمام مكتب التسجيل مباشرة بعد منطقة القهوة الترحيبية. سيكون فريق الفعالية موجودًا قرب المدخل للمساعدة."
+},
+{
+"intent": "cpd_credits",
+"examples": [
+"How many CPD credits are available?",
+"How many credits do I get?",
+"كم عدد ساعات الاعتماد؟"
+],
+"answer_en": "The mock event content lists 8 CPD credits over two days, subject to attendance confirmation at the registration desk each day.",
+"answer_ar": "توضح بيانات الفعالية التجريبية أن إجمالي الاعتماد هو 8 ساعات CPD على مدى يومين، بشرط تأكيد الحضور في مكتب التسجيل كل يوم."
+},
+{
+"intent": "gala_dinner",
+"examples": [
+"Where is the gala dinner?",
+"What time is the gala dinner?",
+"أين يقام حفل العشاء؟"
+],
+"answer_en": "The gala dinner is on the rooftop level from 19:00 to 22:00 on Day 1. Event staff will be available in the lobby from 18:45 to guide guests.",
+"answer_ar": "يقام حفل العشاء في مستوى السطح من الساعة 19:00 إلى 22:00 في اليوم الأول. سيكون فريق الفعالية في اللوبي من الساعة 18:45 لإرشاد الضيوف."
+},
+{
+"intent": "airport_transport",
+"examples": [
+"How can I get to the airport?",
+"How do I get back to the airport?",
+"كيف أذهب إلى المطار؟"
+],
+"answer_en": "Please visit the transport desk in the Grand Foyer for airport shuttle changes or taxi assistance. The demo guidance estimates a taxi to Dubai International Airport at AED 80 to 100.",
+"answer_ar": "يرجى مراجعة مكتب المواصلات في الردهة الكبرى للمساعدة في حافلات المطار أو سيارات الأجرة. في بيانات العرض التجريبي، تكلفة التاكسي إلى مطار دبي الدولي تقريبًا بين 80 و100 درهم."
+},
+{
+"intent": "medical_information_desk_location",
+"examples": [
+"Where is the medical information desk?",
+"Where can I ask medical questions?",
+"أين مكتب المعلومات الطبية؟"
+],
+"answer_en": "The medical information desk is in the Exhibition Area at Booth M1. It is available from 09:30 to 17:30 on Day 1 and 09:30 to 14:30 on Day 2.",
+"answer_ar": "مكتب المعلومات الطبية موجود في منطقة المعرض، جناح M1. يعمل من 09:30 إلى 17:30 في اليوم الأول، ومن 09:30 إلى 14:30 في اليوم الثاني."
+},
+{
+"intent": "cardivex_high_level",
+"examples": [
+"What is Cardivex used for?",
+"Where is Cardivex discussed?",
+"ما استخدام Cardivex؟"
+],
+"answer_en": "In this mock demo, Cardivex is only referenced at a high level in the Day 1 cardiovascular co-morbidities discussion connected to the Oncology Pipeline Updates session in Ballroom A. For product-use or clinical details, please visit the medical information desk at Booth M1.",
+"answer_ar": "في هذا العرض التجريبي، يُذكر Cardivex فقط كمعلومة عامة ضمن نقاش اليوم الأول حول الأمراض القلبية المصاحبة والمرتبط بجلسة Oncology Pipeline Updates في Ballroom A. لأي تفاصيل طبية أو معلومات استخدام، يرجى زيارة مكتب المعلومات الطبية في الجناح M1."
+},
+{
 "intent": "medical_question_refusal",
 "examples": [
 "What dose should I use?",

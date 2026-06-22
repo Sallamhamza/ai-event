@@ -13,6 +13,19 @@ function isTruthy(value: string | undefined): boolean {
   return ["true", "1", "yes"].includes((value || "").toLowerCase());
 }
 
+function jsonAnswer(payload: {
+  answer: string;
+  language: ConciergeLanguage;
+  refused?: boolean;
+  mock?: boolean;
+  fallback?: boolean;
+}) {
+  return Response.json({
+    ...payload,
+    knowledge: "active-event",
+  });
+}
+
 function safeMockAnswer(
   question: string,
   language: ConciergeLanguage,
@@ -53,30 +66,30 @@ export async function POST(request: Request) {
 
     const restricted = getActiveEventRestrictedAnswer(question, language, knowledge);
     if (restricted) {
-      return Response.json({
+      return jsonAnswer({
         answer: restricted,
+        language,
         refused: true,
-        knowledge: "active-event",
       });
     }
 
     if (isTruthy(process.env.USE_MOCK_AI)) {
-      return Response.json({
+      return jsonAnswer({
         answer: getActiveEventMockAnswer(question, language, knowledge),
+        language,
         refused: false,
         mock: true,
-        knowledge: "active-event",
       });
     }
 
     const geminiKey = process.env.GEMINI_API_KEY?.trim();
     if (!geminiKey) {
       console.warn("GEMINI_API_KEY not set - using active-event mock answers");
-      return Response.json({
+      return jsonAnswer({
         answer: getActiveEventMockAnswer(question, language, knowledge),
+        language,
         refused: false,
         mock: true,
-        knowledge: "active-event",
       });
     }
 
@@ -88,19 +101,19 @@ export async function POST(request: Request) {
 
     const result = await model.generateContent(question);
 
-    return Response.json({
+    return jsonAnswer({
       answer: result.response.text(),
+      language,
       refused: false,
-      knowledge: "active-event",
     });
   } catch (error: unknown) {
     console.error("Ask route error:", error);
-    return Response.json({
+    return jsonAnswer({
       answer: safeMockAnswer(question, language, knowledge),
+      language,
       refused: false,
       mock: true,
       fallback: true,
-      knowledge: "active-event",
     });
   }
 }
