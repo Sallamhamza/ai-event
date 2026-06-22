@@ -1,57 +1,99 @@
 "use client";
 
 // hooks/usePushToTalk.ts
-// Full push-to-talk lifecycle:
-//   hold button / space bar → Web Speech API recording
-//   release                 → POST to /api/ask with language → speak answer in same language
+// Push-to-talk with automatic bilingual support (Arabic/English).
+//
+// How language detection works:
+// 1. Speech recognition lang is set from navigator.language (Arabic phones → ar-SA, English → en-US)
+// 2. After transcription, we detect language from the text (Arabic Unicode chars)
+// 3. API receives the detected language and responds in that language
+// 4. TTS speaks the answer in the detected language with appropriate voice
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback } from "react";
 import type { DIDAvatar } from "@/components/AvatarStream";
-import { detectLanguageFromText, type ConciergeLanguage } from "@/lib/language";
 
-// ── Female voice blocklist (works on iOS/Android/Windows) ──────────────────────────
+// ── Language detection from text ─────────────────────────────────────────────
+type Lang = "en" | "ar";
+
+function detectLang(text: string): Lang {
+  // Count Arabic Unicode characters (U+0600–U+06FF range)
+  const arabicCount = (text.match(/[\u0600-\u06FF]/g) || []).length;
+  // If the text contains ANY Arabic characters, it's Arabic
+  // (speech recognition in ar-SA mode produces Arabic text)
+  return arabicCount > 0 ? "ar" : "en";
+}
+
+// ── Female voice blocklist (filter OUT on all platforms) ─────────────────────
 const FEMALE = /female|woman|samantha|victoria|karen|zira|hazel|emma|siri|fiona|moira|tessa|allison|ava|susan|kate|linda|alice|amelie|anna|joana|laura|lekha|luciana|mariska|mei|monica|nora|paulina|satu|sin-ji|soledad|ting-ting|veena|yuna/i;
 
-// ── Voice cache — iOS fix: getVoices() returns [] on first call; must listen to voiceschanged ──
-let _cachedVoices: SpeechSynthesisVoice[] = [];
+// ── Voice cache — iOS fix: getVoices() returns [] on first call ──────────────
+let _voiceCache: SpeechSynthesisVoice[] = [];
 if (typeof window !== "undefined" && window.speechSynthesis) {
-  const loadVoices = () => { _cachedVoices = window.speechSynthesis.getVoices(); };
-  loadVoices();
-  window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+  const load = () => { _voiceCache = window.speechSynthesis.getVoices(); };
+  load();
+  window.speechSynthesis.addEventListener("voiceschanged", load);
 }
-const getVoices = () =>
-  _cachedVoices.length ? _cachedVoices : (window.speechSynthesis?.getVoices() ?? []);
+function cachedVoices(): SpeechSynthesisVoice[] {
+  return _voiceCache.length ? _voiceCache : (window.speechSynthesis?.getVoices() ?? []);
+}
 
+// ── TTS helper ──────────────────────────────────────────────────────────────
+function speakTTS(text: string, lang: Lang): Promise<void> {
+  return new Promise((resolve) => {
+    window.speechSynthesis?.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    const voices = cachedVoices();
+
+    if (lang === "ar") {
+      utter.lang  = "ar-SA";
+      utter.rate  = 0.88;
+      utter.pitch = 1.0;
+      const arVoice =
+        voices.find(v => v.lang === "ar-SA") ??
+        voices.find(v => v.lang.startsWith("ar"));
+      if (arVoice) utter.voice = arVoice;
+    } else {
+      utter.lang  = "en-US";
+      utter.rate  = 0.92;
+      utter.pitch = 0.82; // lower pitch → masculine
+      const male =
+        voices.find(v => v.lang.startsWith("en") && /\bmale\b/i.test(v.name)) ??
+        voices.find(v => v.lang.startsWith("en") && /\b(david|mark|daniel|james|george|ryan|richard|alex|fred|guy|tom|oliver|rishi|aaron|arthur|thomas)\b/i.test(v.name)) ??
+        voices.find(v => v.lang.startsWith("en-US") && !FEMALE.test(v.name)) ??
+        voices.find(v => v.lang.startsWith("en")    && !FEMALE.test(v.name));
+      if (male) utter.voice = male;
+    }
+
+    utter.onend   = () => resolve();
+    utter.onerror = () => resolve();
+    window.speechSynthesis?.speak(utter);
+  });
+}
+
+// ── Exports ─────────────────────────────────────────────────────────────────
 export type PTTStatus = "idle" | "listening" | "thinking" | "speaking" | "error";
 
 interface UsePushToTalkOptions {
-  avatar?:      DIDAvatar | null;
-  language?:    ConciergeLanguage;        // set from parent language toggle
+  avatar?:       DIDAvatar | null;
   onTranscript?: (text: string) => void;
   onAnswer?:     (text: string) => void;
-  onLanguageResolved?: (language: ConciergeLanguage) => void;
+  onLanguageDetected?: (lang: Lang) => void;  // tells parent what language was detected
 }
 
 export function usePushToTalk({
   avatar,
-  language = "en",
   onTranscript,
   onAnswer,
-  onLanguageResolved,
+  onLanguageDetected,
 }: UsePushToTalkOptions) {
   const [status, setStatus] = useState<PTTStatus>("idle");
   const [liveTranscript, setLiveTranscript] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError]   = useState<string | null>(null);
 
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef     = useRef<SpeechRecognition | null>(null);
   const finalTranscriptRef = useRef("");
-  const languageRef = useRef<ConciergeLanguage>(language);
 
-  useEffect(() => {
-    languageRef.current = language;
-  }, [language]);
-
-  // ── Start recording ─────────────────────────────────────────────────────────
+  // ── Start recording ─────────────────────────────────────────────────────
   const startListening = useCallback(() => {
     if (status !== "idle") return;
 
@@ -66,10 +108,15 @@ export function usePushToTalk({
     }
 
     const recognition = new SpeechRecognitionAPI();
-    const recognitionLanguage = languageRef.current;
-    recognition.lang           = recognitionLanguage === "ar" ? "ar-SA" : "en-US";
-    recognition.continuous     = true;
-    recognition.interimResults = true;
+
+    // Auto-detect recognition language from device:
+    // Arabic phones (ar-SA, ar-AE, etc.) → recognize Arabic
+    // Everything else → recognize English
+    const navLang = (navigator.language || "en-US").toLowerCase();
+    recognition.lang = navLang.startsWith("ar") ? "ar-SA" : "en-US";
+
+    recognition.continuous      = true;
+    recognition.interimResults  = true;
     recognition.maxAlternatives = 1;
 
     finalTranscriptRef.current = "";
@@ -79,7 +126,7 @@ export function usePushToTalk({
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       let interim = "";
-      let final = "";
+      let final   = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const text = event.results[i][0].transcript;
         if (event.results[i].isFinal) final += text;
@@ -99,7 +146,7 @@ export function usePushToTalk({
     recognition.start();
   }, [status]);
 
-  // ── Stop recording, send to Gemini, speak answer ────────────────────────────
+  // ── Stop recording → detect language → ask API → speak answer ──────────
   const stopListening = useCallback(async () => {
     if (status !== "listening") return;
 
@@ -116,71 +163,39 @@ export function usePushToTalk({
     onTranscript?.(transcript);
     setStatus("thinking");
 
-    // The transcript decides the answer language. The toggle is only a recognition hint.
-    const requestLang = detectLanguageFromText(transcript, languageRef.current);
-    onLanguageResolved?.(requestLang);
+    // Detect language from what the user actually said
+    const lang = detectLang(transcript);
+    onLanguageDetected?.(lang);
 
     try {
       const res = await fetch("/api/ask", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ question: transcript, language: requestLang }),
+        body:    JSON.stringify({ question: transcript, language: lang }),
       });
       const data   = await res.json();
       const answer = data.answer ?? (
-        requestLang === "ar"
+        lang === "ar"
           ? "عذرًا، لم أتمكن من الحصول على إجابة. يرجى المحاولة مرة أخرى."
           : "Sorry, I couldn't get an answer. Please try again."
       );
-      const answerFallbackLang: ConciergeLanguage = data.language === "ar" ? "ar" : requestLang;
-      const speechLang = detectLanguageFromText(
-        answer,
-        answerFallbackLang
-      );
-      onLanguageResolved?.(speechLang);
+
+      // Double-check: if the API returned Arabic text, speak in Arabic
+      const answerLang = detectLang(answer);
+      onLanguageDetected?.(answerLang);
       onAnswer?.(answer);
 
       setStatus("speaking");
 
-      const speakViaTTS = async (text: string) => {
-        await new Promise<void>((resolve) => {
-          window.speechSynthesis?.cancel();
-          const utter  = new SpeechSynthesisUtterance(text);
-          const voices = getVoices();
-
-          if (speechLang === "ar") {
-            utter.lang  = "ar-SA";
-            utter.rate  = 0.88;
-            utter.pitch = 1.0;
-            const arVoice =
-              voices.find(v => v.lang === "ar-SA") ??
-              voices.find(v => v.lang.startsWith("ar"));
-            if (arVoice) utter.voice = arVoice;
-          } else {
-            utter.lang  = "en-US";
-            utter.rate  = 0.92;
-            utter.pitch = 0.82;
-            const maleVoice =
-              voices.find(v => v.lang.startsWith("en") && /\bmale\b/i.test(v.name)) ??
-              voices.find(v => v.lang.startsWith("en") && /\b(david|mark|daniel|james|george|ryan|richard|alex|fred|guy|tom|oliver|rishi|aaron|arthur|thomas)\b/i.test(v.name)) ??
-              voices.find(v => v.lang.startsWith("en-US") && !FEMALE.test(v.name)) ??
-              voices.find(v => v.lang.startsWith("en")    && !FEMALE.test(v.name));
-            if (maleVoice) utter.voice = maleVoice;
-          }
-          utter.onend  = () => resolve();
-          utter.onerror= () => resolve();
-          window.speechSynthesis?.speak(utter);
-        });
-      };
-
+      // Speak the answer
       if (avatar) {
         try {
-          await avatar.speak(answer, speechLang);
+          await avatar.speak(answer, answerLang);
         } catch {
-          await speakViaTTS(answer);
+          await speakTTS(answer, answerLang);
         }
       } else {
-        await speakViaTTS(answer);
+        await speakTTS(answer, answerLang);
       }
 
       setStatus("idle");
@@ -191,9 +206,9 @@ export function usePushToTalk({
     }
 
     setLiveTranscript("");
-  }, [status, liveTranscript, avatar, onTranscript, onAnswer, onLanguageResolved]);
+  }, [status, liveTranscript, avatar, onTranscript, onAnswer, onLanguageDetected]);
 
-  // ── Reset error ─────────────────────────────────────────────────────────────
+  // ── Reset ───────────────────────────────────────────────────────────────
   const reset = useCallback(() => {
     recognitionRef.current?.stop();
     recognitionRef.current = null;

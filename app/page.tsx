@@ -20,13 +20,12 @@ export default function KioskPage() {
   const { status, liveTranscript, error, startListening, stopListening, reset } =
     usePushToTalk({
       avatar,
-      language: lang,
       onTranscript: (text) => {
         setTranscript(text);
         setAnswer("");
       },
       onAnswer: setAnswer,
-      onLanguageResolved: setLang,
+      onLanguageDetected: setLang,
     });
 
   const displayTranscript = liveTranscript || transcript;
@@ -533,9 +532,8 @@ export default function KioskPage() {
               <button
                 className="icon-button lang-toggle"
                 type="button"
-                aria-label={`Current language: ${lang === "ar" ? "Arabic" : "English"}. Toggle language.`}
-                aria-pressed={lang === "ar"}
-                title={lang === "ar" ? "Arabic selected" : "English selected"}
+                aria-label={`Detected language: ${lang === "ar" ? "Arabic" : "English"}`}
+                title={lang === "ar" ? "Arabic detected" : "English detected"}
                 onClick={() => setLang(l => l === "en" ? "ar" : "en")}
                 style={{
                   fontSize: "11px", fontWeight: 700,
@@ -550,7 +548,7 @@ export default function KioskPage() {
                   minWidth: 44,
                 }}
               >
-                {lang === "ar" ? "AR" : "EN"}
+                {lang === "ar" ? "عربي" : "EN"}
               </button>
               <button
                 className="icon-button icon-button--mute"
