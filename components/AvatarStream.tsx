@@ -16,7 +16,7 @@ import HologramAvatar from "./HologramAvatar";
 export type AvatarState = "loading" | "ready" | "speaking" | "stopped" | "error";
 
 export interface DIDAvatar {
-  speak: (text: string) => Promise<void>;
+  speak: (text: string, lang?: "en" | "ar") => Promise<void>;
   stop:  () => Promise<void>;
 }
 
@@ -34,20 +34,38 @@ function estimateSpeechMs(text: string) {
   return Math.max(1600, Math.min(24_000, text.length * 58));
 }
 
-// ── Browser TTS helper — male voice preferred ────────────────────────────────
-function browserSpeak(text: string): Promise<void> {
+// ── Browser TTS — male English / native Arabic ───────────────────────────────
+// Strategy for male English: filter OUT known female voices (works on iOS/Android/Windows)
+// because mobile browsers rarely label voices as "male" by name.
+const FEMALE_VOICE_PATTERN = /female|woman|samantha|victoria|karen|zira|hazel|emma|siri|fiona|moira|tessa|allison|ava|susan|kate|linda|alice|amelie|anna|joana|laura|lekha|luciana|mariska|mei|monica|nora|paulina|satu|sin-ji|soledad|ting-ting|veena|yuna/i;
+
+function browserSpeak(text: string, lang: "en" | "ar" = "en"): Promise<void> {
   return new Promise((resolve) => {
     window.speechSynthesis?.cancel();
     const utter = new SpeechSynthesisUtterance(text);
-    utter.lang  = "en-US";
-    utter.rate  = 0.92;
-    utter.pitch = 0.9;  // slightly lower = more authoritative male tone
     const voices = window.speechSynthesis?.getVoices() ?? [];
-    // Prefer a male English voice
-    const preferred =
-      voices.find(v => v.lang.startsWith("en") && /\bmale\b/i.test(v.name)) ??
-      voices.find(v => v.lang.startsWith("en") && /david|mark|daniel|james|george|ryan|richard/i.test(v.name));
-    if (preferred) utter.voice = preferred;
+
+    if (lang === "ar") {
+      utter.lang  = "ar-SA";
+      utter.rate  = 0.88;
+      utter.pitch = 1.0;
+      const arVoice = voices.find(v => v.lang.startsWith("ar"));
+      if (arVoice) utter.voice = arVoice;
+    } else {
+      utter.lang  = "en-US";
+      utter.rate  = 0.92;
+      utter.pitch = 0.82; // low pitch = masculine sound on any voice
+      // 1) Explicit male label (Windows/Android/some macOS)
+      const maleVoice =
+        voices.find(v => v.lang.startsWith("en") && /\bmale\b/i.test(v.name)) ??
+        // 2) Common male voice names across platforms
+        voices.find(v => v.lang.startsWith("en") && /\b(david|mark|daniel|james|george|ryan|richard|alex|fred|guy|tom|oliver|rishi|aaron|arthur|thomas)\b/i.test(v.name)) ??
+        // 3) Any English voice that is NOT a known female voice (safest for iOS)
+        voices.find(v => v.lang.startsWith("en-US") && !FEMALE_VOICE_PATTERN.test(v.name)) ??
+        voices.find(v => v.lang.startsWith("en")    && !FEMALE_VOICE_PATTERN.test(v.name));
+      if (maleVoice) utter.voice = maleVoice;
+    }
+
     utter.onend  = () => resolve();
     utter.onerror= () => resolve();
     window.speechSynthesis?.speak(utter);
@@ -72,33 +90,23 @@ export default function AvatarStream({
   const updateState = useCallback((s: AvatarState) => onStateChange?.(s), [onStateChange]);
 
   // ── speak: D-ID stream first, browser TTS as fallback ───────────────────────
-  const didSpeak = useCallback(async (text: string) => {
+  const didSpeak = useCallback(async (text: string, lang: "en" | "ar" = "en") => {
     if (streamIdRef.current && sessionIdRef.current) {
       try {
-        const video = videoRef.current;
-        if (video) {
-          video.muted = false;
-          video.volume = 1;
-          video.play().catch(() => {});
-        }
-
         const res = await fetch("/api/did-stream/talk", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ streamId: streamIdRef.current, sessionId: sessionIdRef.current, text }),
+          body:    JSON.stringify({
+            streamId:  streamIdRef.current,
+            sessionId: sessionIdRef.current,
+            text,
+            language:  lang,
+          }),
         });
-        if (res.ok) {
-          const data = await res.json().catch(() => ({}));
-          const durationMs =
-            typeof data?.duration === "number"
-              ? Math.max(1200, Math.min(24_000, data.duration * 1000))
-              : estimateSpeechMs(text);
-          await new Promise((resolve) => window.setTimeout(resolve, durationMs));
-          return;
-        }
+        if (res.ok) return;                // D-ID replied — video will animate
       } catch { /* fall through to TTS */ }
     }
-    await browserSpeak(text);
+    await browserSpeak(text, lang);
   }, []);
 
   const didStop = useCallback(async () => {

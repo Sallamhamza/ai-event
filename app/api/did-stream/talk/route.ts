@@ -11,11 +11,17 @@ function authHeader() {
 
 export async function POST(req: Request) {
   try {
-    const { streamId, sessionId, text } = await req.json();
+    const { streamId, sessionId, text, language } = await req.json();
+    const lang = language === "ar" ? "ar" : "en";
 
     if (!streamId || !text) {
       return Response.json({ error: "Missing streamId or text" }, { status: 400 });
     }
+
+    // Male voices: English = GuyNeural, Arabic = HamedNeural
+    const voiceId = lang === "ar"
+      ? (process.env.DID_VOICE_ID_AR?.trim() || "ar-SA-HamedNeural")
+      : (process.env.DID_VOICE_ID?.trim()    || "en-US-GuyNeural");
 
     const res = await fetch(`${DID_API}/talks/streams/${streamId}`, {
       method: "POST",
@@ -25,14 +31,11 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         script: {
-          type: "text",
-          input: text,
-          provider: {
-            type: "microsoft",
-            voice_id: process.env.DID_VOICE_ID?.trim() || "en-US-GuyNeural",
-          },
+          type:     "text",
+          input:    text,
+          provider: { type: "microsoft", voice_id: voiceId },
         },
-        config: { stitch: true },
+        config:     { stitch: true },
         session_id: sessionId,
       }),
     });

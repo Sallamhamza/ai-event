@@ -3,11 +3,20 @@
 // hooks/usePushToTalk.ts
 // Full push-to-talk lifecycle:
 //   hold button / space bar → Web Speech API recording
-//   release                 → POST transcript to /api/ask
-//   answer received         → avatar.speak(answer)  [D-ID stream or browser TTS]
+//   release                 → detect language → POST to /api/ask → speak answer in same language
+//   language auto-detected from Arabic Unicode characters in transcript
 
 import { useRef, useState, useCallback } from "react";
 import type { DIDAvatar } from "@/components/AvatarStream";
+
+// ── Language detection ──────────────────────────────────────────────────────────────────
+function detectLanguage(text: string): "en" | "ar" {
+  const arabicChars = (text.match(/[\u0600-\u06FF]/g) || []).length;
+  return arabicChars > 2 ? "ar" : "en";
+}
+
+// ── Female voice pattern (to exclude on all platforms) ──────────────────────────────
+const FEMALE_VOICE_PATTERN = /female|woman|samantha|victoria|karen|zira|hazel|emma|siri|fiona|moira|tessa|allison|ava|susan|kate|linda|alice|amelie|anna|joana|laura|lekha|luciana|mariska|mei|monica|nora|paulina|satu|sin-ji|soledad|ting-ting|veena|yuna/i;
 
 export type PTTStatus =
   | "idle"
@@ -45,8 +54,10 @@ export function usePushToTalk({ avatar, onTranscript, onAnswer }: UsePushToTalkO
     }
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.lang = "en-US";
-    recognition.continuous = true;
+    // Use browser language as hint — Arabic speakers get better recognition in ar-SA
+    const browserLang = navigator.language || "en-US";
+    recognition.lang = browserLang.startsWith("ar") ? "ar-SA" : "en-US";
+    recognition.continuous    = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
@@ -94,30 +105,44 @@ export function usePushToTalk({ avatar, onTranscript, onAnswer }: UsePushToTalkO
     onTranscript?.(transcript);
     setStatus("thinking");
 
+    // Auto-detect language from transcript characters
+    const language = detectLanguage(transcript);
+
     try {
       const res = await fetch("/api/ask", {
-        method: "POST",
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: transcript }),
+        body:    JSON.stringify({ question: transcript, language }),
       });
-      const data = await res.json();
+      const data   = await res.json();
       const answer = data.answer ?? "Sorry, I couldn't get an answer. Please try again.";
       onAnswer?.(answer);
 
       setStatus("speaking");
 
-      const speakViaTTS = async (text: string) => {
+      const speakViaTTS = async (text: string, lang: "en" | "ar") => {
         await new Promise<void>((resolve) => {
           window.speechSynthesis?.cancel();
-          const utter = new SpeechSynthesisUtterance(text);
-          utter.lang  = "en-US";
-          utter.rate  = 0.92;
-          utter.pitch = 0.9; // lower pitch = male tone
+          const utter  = new SpeechSynthesisUtterance(text);
           const voices = window.speechSynthesis?.getVoices() ?? [];
-          const preferred =
-            voices.find(v => v.lang.startsWith("en") && /\bmale\b/i.test(v.name)) ??
-            voices.find(v => v.lang.startsWith("en") && /david|mark|daniel|james|george|ryan|richard/i.test(v.name));
-          if (preferred) utter.voice = preferred;
+
+          if (lang === "ar") {
+            utter.lang  = "ar-SA";
+            utter.rate  = 0.88;
+            utter.pitch = 1.0;
+            const arVoice = voices.find(v => v.lang.startsWith("ar"));
+            if (arVoice) utter.voice = arVoice;
+          } else {
+            utter.lang  = "en-US";
+            utter.rate  = 0.92;
+            utter.pitch = 0.82;
+            const maleVoice =
+              voices.find(v => v.lang.startsWith("en") && /\bmale\b/i.test(v.name)) ??
+              voices.find(v => v.lang.startsWith("en") && /\b(david|mark|daniel|james|george|ryan|richard|alex|fred|guy|tom|oliver|rishi|aaron|arthur|thomas)\b/i.test(v.name)) ??
+              voices.find(v => v.lang.startsWith("en-US") && !FEMALE_VOICE_PATTERN.test(v.name)) ??
+              voices.find(v => v.lang.startsWith("en")    && !FEMALE_VOICE_PATTERN.test(v.name));
+            if (maleVoice) utter.voice = maleVoice;
+          }
           utter.onend  = () => resolve();
           utter.onerror= () => resolve();
           window.speechSynthesis?.speak(utter);
@@ -126,13 +151,12 @@ export function usePushToTalk({ avatar, onTranscript, onAnswer }: UsePushToTalkO
 
       if (avatar) {
         try {
-          await avatar.speak(answer);
+          await avatar.speak(answer, language);
         } catch {
-          // D-ID stream failed mid-session — fall back to browser TTS
-          await speakViaTTS(answer);
+          await speakViaTTS(answer, language);
         }
       } else {
-        await speakViaTTS(answer);
+        await speakViaTTS(answer, language);
       }
 
       setStatus("idle");
