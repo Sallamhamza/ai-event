@@ -20,6 +20,7 @@ export default function KioskPage() {
   const { status, liveTranscript, error, startListening, stopListening, reset } =
     usePushToTalk({
       avatar,
+      language: lang,
       onTranscript: (text) => {
         setTranscript(text);
         setAnswer("");

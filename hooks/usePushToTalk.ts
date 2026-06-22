@@ -75,13 +75,15 @@ export type PTTStatus = "idle" | "listening" | "thinking" | "speaking" | "error"
 
 interface UsePushToTalkOptions {
   avatar?:       DIDAvatar | null;
+  language?:     Lang;             // set by toggle in page.tsx — controls recognition language
   onTranscript?: (text: string) => void;
   onAnswer?:     (text: string) => void;
-  onLanguageDetected?: (lang: Lang) => void;  // tells parent what language was detected
+  onLanguageDetected?: (lang: Lang) => void;
 }
 
 export function usePushToTalk({
   avatar,
+  language = "en",
   onTranscript,
   onAnswer,
   onLanguageDetected,
@@ -109,11 +111,10 @@ export function usePushToTalk({
 
     const recognition = new SpeechRecognitionAPI();
 
-    // Auto-detect recognition language from device:
-    // Arabic phones (ar-SA, ar-AE, etc.) → recognize Arabic
-    // Everything else → recognize English
-    const navLang = (navigator.language || "en-US").toLowerCase();
-    recognition.lang = navLang.startsWith("ar") ? "ar-SA" : "en-US";
+    // The toggle controls recognition language.
+    // This is REQUIRED — Web Speech API can only transcribe one language at a time.
+    // If set to en-US and user speaks Arabic, transcript is garbage.
+    recognition.lang = language === "ar" ? "ar-SA" : "en-US";
 
     recognition.continuous      = true;
     recognition.interimResults  = true;
@@ -144,7 +145,7 @@ export function usePushToTalk({
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [status]);
+  }, [status, language]);
 
   // ── Stop recording → detect language → ask API → speak answer ──────────
   const stopListening = useCallback(async () => {
@@ -206,7 +207,7 @@ export function usePushToTalk({
     }
 
     setLiveTranscript("");
-  }, [status, liveTranscript, avatar, onTranscript, onAnswer, onLanguageDetected]);
+  }, [status, liveTranscript, avatar, language, onTranscript, onAnswer, onLanguageDetected]);
 
   // ── Reset ───────────────────────────────────────────────────────────────
   const reset = useCallback(() => {
