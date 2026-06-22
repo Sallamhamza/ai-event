@@ -3,7 +3,9 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   buildActiveEventSystemPrompt,
   containsArabicText,
+  getActiveEventIdentityAnswer,
   getActiveEventMockAnswer,
+  getActiveEventOutOfScopeAnswer,
   getActiveEventRestrictedAnswer,
   loadActiveEventKnowledge,
   resolveLanguage,
@@ -48,8 +50,11 @@ function buildUserPrompt(question: string, language: ConciergeLanguage): string 
   if (language === "ar") {
     return [
       "أجب باللغة العربية فقط.",
+      "تم اختيار العربية أو تم اكتشاف سؤال عربي؛ لا ترد بالإنجليزية إلا للأسماء الرسمية والاختصارات.",
       "استخدم الإنجليزية فقط لأسماء القاعات أو العلامات التجارية أو الاختصارات الرسمية مثل Ballroom A أو CPD.",
       "اكتب كنص عادي مناسب للصوت. لا تستخدم Markdown أو النجوم أو التنسيق الغامق أو الجداول.",
+      "أنت AIVENT دائمًا. لا تستخدم اسم Nour أو أي اسم آخر.",
+      "أجب فقط عن معلومات الفعالية والمؤتمر الدوائي المعتمدة. ارفض أي سؤال خارج هذا النطاق.",
       "إذا لم تكن المعلومة موجودة في JSON الفعالية، قل ذلك بالعربية ووجّه الزائر إلى مكتب المعلومات.",
       "",
       `سؤال الزائر: ${question}`,
@@ -60,6 +65,8 @@ function buildUserPrompt(question: string, language: ConciergeLanguage): string 
     "Answer in English only.",
     "Use only the active event JSON from the system instructions.",
     "Write plain speech-friendly text only. Do not use Markdown, asterisks, bold formatting, tables, or bullet lists.",
+    "You are always AIVENT. Do not use the name Nour or any other name.",
+    "Answer only event information and approved pharma congress information. Refuse anything outside that scope.",
     "",
     `Delegate question: ${question}`,
   ].join("\n");
@@ -127,6 +134,24 @@ export async function POST(request: Request) {
     if (restricted) {
       return jsonAnswer({
         answer: restricted,
+        language,
+        refused: true,
+      });
+    }
+
+    const identity = getActiveEventIdentityAnswer(question, language);
+    if (identity) {
+      return jsonAnswer({
+        answer: identity,
+        language,
+        refused: false,
+      });
+    }
+
+    const outOfScope = getActiveEventOutOfScopeAnswer(question, language, knowledge);
+    if (outOfScope) {
+      return jsonAnswer({
+        answer: outOfScope,
         language,
         refused: true,
       });

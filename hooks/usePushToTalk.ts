@@ -15,12 +15,12 @@ import type { DIDAvatar } from "@/components/AvatarStream";
 // ── Language detection from text ─────────────────────────────────────────────
 type Lang = "en" | "ar";
 
-function detectLang(text: string): Lang {
+function detectLang(text: string, fallback: Lang = "en"): Lang {
   // Count Arabic Unicode characters (U+0600–U+06FF range)
   const arabicCount = (text.match(/[\u0600-\u06FF]/g) || []).length;
-  // If the text contains ANY Arabic characters, it's Arabic
-  // (speech recognition in ar-SA mode produces Arabic text)
-  return arabicCount > 0 ? "ar" : "en";
+  // If Chrome returns Arabic script, trust it. Otherwise use the active
+  // recognition language as the best signal for spoken Arabic.
+  return arabicCount > 0 ? "ar" : fallback;
 }
 
 // ── Female voice blocklist (filter OUT on all platforms) ─────────────────────
@@ -164,8 +164,9 @@ export function usePushToTalk({
     onTranscript?.(transcript);
     setStatus("thinking");
 
-    // Detect language from what the user actually said
-    const lang = detectLang(transcript);
+    // Detect language from what the user actually said. If Arabic recognition
+    // was selected but Chrome returns Latin text, keep Arabic as the language.
+    const lang = detectLang(transcript, language);
     onLanguageDetected?.(lang);
 
     try {
@@ -182,7 +183,7 @@ export function usePushToTalk({
       );
 
       // Double-check: if the API returned Arabic text, speak in Arabic
-      const answerLang = detectLang(answer);
+      const answerLang = detectLang(answer, lang);
       onLanguageDetected?.(answerLang);
       onAnswer?.(answer);
 
@@ -207,7 +208,7 @@ export function usePushToTalk({
     }
 
     setLiveTranscript("");
-  }, [status, liveTranscript, avatar, onTranscript, onAnswer, onLanguageDetected]);
+  }, [status, liveTranscript, avatar, language, onTranscript, onAnswer, onLanguageDetected]);
 
   // ── Reset ───────────────────────────────────────────────────────────────
   const reset = useCallback(() => {

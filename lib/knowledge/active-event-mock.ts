@@ -1,6 +1,5 @@
 import fs from "fs";
 import path from "path";
-import { detectLanguageFromText } from "@/lib/language";
 
 export type ConciergeLanguage = "en" | "ar";
 
@@ -158,7 +157,52 @@ export function containsArabicText(value: string): boolean {
 }
 
 export function resolveLanguage(question: string, language: ConciergeLanguage): ConciergeLanguage {
-  return detectLanguageFromText(question, language);
+  return language === "ar" || containsArabicText(question) ? "ar" : "en";
+}
+
+export function getActiveEventIdentityAnswer(
+  question: string,
+  language: ConciergeLanguage
+): string | null {
+  const q = normalize(question);
+  const lang = resolveLanguage(question, language);
+  const isIdentityQuestion = matchesAny(q, [
+    "who are you",
+    "what is your name",
+    "your name",
+    "introduce yourself",
+    "what can you do",
+    "help me",
+    "من انت",
+    "من أنت",
+    "ما اسمك",
+    "اسمك",
+    "عرف نفسك",
+    "ماذا تستطيع",
+    "بماذا تساعد",
+  ]);
+
+  if (!isIdentityQuestion) return null;
+
+  return lang === "ar"
+    ? "أنا AIVENT، مساعدك الذكي للفعالية. أستطيع مساعدتك فقط في معلومات Gulf Pharma Connect 2026 مثل الجدول، المتحدثين، الموقع، التسجيل، المواصلات، الواي فاي، الوجبات، الشهادات ومعلومات المؤتمر الدوائي المعتمدة."
+    : "I am AIVENT, your AI event concierge. I can help only with Gulf Pharma Connect 2026 information such as the agenda, speakers, venue, registration, transport, Wi-Fi, meals, certificates, and approved pharma congress details.";
+}
+
+export function getActiveEventOutOfScopeAnswer(
+  question: string,
+  language: ConciergeLanguage,
+  knowledge: ActiveEventKnowledge
+): string | null {
+  const q = normalize(question);
+  const lang = resolveLanguage(question, language);
+
+  if (getActiveEventIdentityAnswer(question, lang)) return null;
+  if (isAllowedEventOrPharmaQuestion(q)) return null;
+
+  return lang === "ar"
+    ? knowledge.fallbacks?.out_of_scope_ar ?? "أنا AIVENT، ويمكنني فقط المساعدة في معلومات الفعالية والمؤتمر الدوائي المعتمدة. يرجى توجيه أي موضوع آخر إلى فريق الفعالية."
+    : knowledge.fallbacks?.out_of_scope_en ?? "I am AIVENT, and I can only help with event information and approved pharma congress details. Please ask the event team about anything outside that scope.";
 }
 
 export function getActiveEventRestrictedAnswer(
@@ -237,6 +281,12 @@ export function getActiveEventMockAnswer(
   const restricted = getActiveEventRestrictedAnswer(question, lang, knowledge);
   if (restricted) return restricted;
 
+  const identity = getActiveEventIdentityAnswer(question, lang);
+  if (identity) return identity;
+
+  const outOfScope = getActiveEventOutOfScopeAnswer(question, lang, knowledge);
+  if (outOfScope) return outOfScope;
+
   const common = findCommonQuestionAnswer(question, lang, knowledge);
   if (common) return common;
 
@@ -253,15 +303,15 @@ export function buildActiveEventSystemPrompt(
   knowledge: ActiveEventKnowledge,
   language: ConciergeLanguage
 ): string {
-  const persona = extractPersonaName(knowledge);
   const answerLanguage = language === "ar" ? "Arabic" : "English";
 
   return `
-You are ${persona}, the AI event concierge for the active event.
+You are AIVENT, the AI event concierge for the active event.
 
 Answer in ${answerLanguage}.
+Your name is always AIVENT. Never call yourself Nour or any other name.
 Use only the active event JSON below as your source of truth.
-Help delegates with event logistics, agenda, speakers, venue directions, registration, transport, Wi-Fi, meals, certificates, CPD credits, exhibition areas, information desks, and approved high-level congress information.
+Help delegates only with pharma-event topics: event logistics, agenda, speakers, venue directions, registration, transport, Wi-Fi, meals, certificates, CPD credits, exhibition areas, information desks, and approved high-level pharma congress information from the active event JSON.
 
 Rules:
 1. Keep answers concise and professional, usually under 3 sentences.
@@ -270,6 +320,8 @@ Rules:
 4. If a product or medical question needs clinical detail, direct the delegate to the medical information desk or official medical representative.
 5. If the answer is not in the JSON, say you do not have it and direct the delegate to the information desk.
 6. Return plain speech-friendly text only. Do not use Markdown, asterisks, bold formatting, tables, or bullet lists.
+7. Refuse any question outside this pharma event scope, including general knowledge, entertainment, politics, sports, coding, weather, finance, legal, or unrelated personal advice.
+8. If asked who you are, say you are AIVENT, the AI event concierge.
 
 Active event JSON:
 ${JSON.stringify(knowledge, null, 2)}
@@ -508,6 +560,128 @@ function formatZones(zones: ExhibitionZone[] | undefined): string {
     .join(", ");
 }
 
+function isAllowedEventOrPharmaQuestion(q: string): boolean {
+  const allowedTerms = [
+    "gulf pharma",
+    "pharma connect",
+    "pharma",
+    "pharmaceutical",
+    "congress",
+    "conference",
+    "event",
+    "agenda",
+    "schedule",
+    "program",
+    "session",
+    "keynote",
+    "panel",
+    "workshop",
+    "speaker",
+    "presenter",
+    "opening",
+    "closing",
+    "registration",
+    "badge",
+    "check in",
+    "venue",
+    "direction",
+    "directions",
+    "room",
+    "ballroom",
+    "foyer",
+    "conrad",
+    "wifi",
+    "wi fi",
+    "internet",
+    "password",
+    "lunch",
+    "dinner",
+    "meal",
+    "coffee",
+    "halal",
+    "vegetarian",
+    "vegan",
+    "gluten",
+    "allergy",
+    "prayer",
+    "parking",
+    "valet",
+    "transport",
+    "airport",
+    "shuttle",
+    "taxi",
+    "metro",
+    "hotel",
+    "certificate",
+    "attendance",
+    "cpd",
+    "credit",
+    "exhibition",
+    "booth",
+    "sponsor",
+    "poster",
+    "medical information desk",
+    "medical desk",
+    "representative",
+    "cardivex",
+    "oncology",
+    "clinical trials",
+    "digital health",
+    "regulatory",
+    "market access",
+    "emergency",
+    "first day",
+    "day 1",
+    "day one",
+    "day 2",
+    "day two",
+    "فعالية",
+    "المؤتمر",
+    "الدوائي",
+    "فارما",
+    "جدول",
+    "برنامج",
+    "جلسة",
+    "الجلسة",
+    "محاضرة",
+    "المحاضرة",
+    "متحدث",
+    "المتحدث",
+    "التسجيل",
+    "بطاقة",
+    "المكان",
+    "القاعة",
+    "غرفة",
+    "كيف اصل",
+    "كيف أصل",
+    "واي فاي",
+    "كلمة المرور",
+    "انترنت",
+    "الغداء",
+    "العشاء",
+    "القهوة",
+    "حلال",
+    "نباتي",
+    "صلاة",
+    "مواقف",
+    "مواصلات",
+    "المطار",
+    "تاكسي",
+    "المترو",
+    "الفندق",
+    "شهادة",
+    "اعتماد",
+    "المعرض",
+    "جناح",
+    "الرعاة",
+    "مكتب المعلومات الطبية",
+    "كارديفكس",
+    "طوارئ",
+  ];
+
+  return allowedTerms.some(term => q.includes(normalize(term)));
+}
+
 function translateDirection(direction: DirectionInfo): string {
   const target = normalize(direction.to ?? "");
 
@@ -531,12 +705,6 @@ function translateDirection(direction: DirectionInfo): string {
   }
 
   return direction.answer ?? "يرجى مراجعة مكتب المعلومات للحصول على الاتجاهات الدقيقة.";
-}
-
-function extractPersonaName(k: ActiveEventKnowledge): string {
-  const primaryRole = k.conversation_policy?.primary_role ?? "";
-  const match = primaryRole.match(/^([A-Za-z\u0600-\u06ff]+)/);
-  return match?.[1] ?? "Aivent";
 }
 
 function fallback(k: ActiveEventKnowledge, lang: ConciergeLanguage): string {

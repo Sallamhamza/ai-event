@@ -24,8 +24,8 @@ function getMockResponse(transcript: string): string {
   if (t.includes("badge") || t.includes("register"))
     return "The registration desk is in the Grand Foyer on the ground floor, open from 7:30 AM today.";
   if (t.includes("cardivex") || t.includes("atorvastatin"))
-    return "Cardivex is approved for the management of elevated cholesterol and mixed lipid disorders in adult patients. It is available as a once-daily tablet in 20, 40, and 80 mg strengths. For clinical details, please visit the Sanofi booth.";
-  return "Welcome to Gulf Pharma Connect 2026! I am Nour, your AI concierge. You can ask me about the schedule, venue, speakers, transport, meals, or our featured products.";
+    return "AIVENT can only share approved high-level event information. Cardivex is referenced in the congress program; for product-use, dosing, safety, or clinical details, please visit the medical information desk.";
+  return "Welcome to Gulf Pharma Connect 2026. I am AIVENT, your AI event concierge. You can ask me about the schedule, venue, speakers, registration, transport, meals, certificates, and approved pharma congress information.";
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     // Global guardrail
     if (checkGlobalGuardrail(transcript)) {
       return Response.json({
-        answer:  "That is outside what I can help with here. Please speak to a qualified professional or visit our registration desk.",
+        answer:  "I am AIVENT, and I can only help with event information and approved pharma congress information. Please speak to a qualified professional or visit the information desk.",
         blocked: true,
       });
     }
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     const blockedDrug = checkDrugGuardrail(transcript, knowledge);
     if (blockedDrug) {
       return Response.json({
-        answer:  `For clinical questions about ${blockedDrug}, please speak to a medical representative at our booth. I am happy to help with event logistics.`,
+        answer:  `I am AIVENT. For clinical questions about ${blockedDrug}, please speak to a medical representative at the medical information desk. I can help with event logistics and approved congress information.`,
         blocked: true,
       });
     }
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
       {
         error:  "Concierge request failed",
         debug:  message,
-        answer: "I am sorry, I had trouble with that. Please try again or speak to a team member.",
+        answer: "I am AIVENT. I had trouble with that request, so please try again or speak to a team member.",
       },
       { status: 500 }
     );
