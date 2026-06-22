@@ -30,10 +30,6 @@ interface AvatarStreamProps {
 
 const AGENT_PORTRAIT = "/male-avatar-hologram.png";
 
-function estimateSpeechMs(text: string) {
-  return Math.max(1600, Math.min(24_000, text.length * 58));
-}
-
 // ── Browser TTS — male English / native Arabic ───────────────────────────────
 // Strategy for male English: filter OUT known female voices (works on iOS/Android/Windows)
 // because mobile browsers rarely label voices as "male" by name.
