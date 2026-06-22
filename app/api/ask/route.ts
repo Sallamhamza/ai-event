@@ -91,8 +91,11 @@ export async function POST(request: Request) {
             return Response.json({ answer: refusal, refused: true });
         }
 
-        // Mock mode flag
-        if (process.env.USE_MOCK_AI === "true") {
+        // Mock mode flag (case-insensitive — works with "true", "True", "TRUE")
+        const mockMode = ["true","1","yes"].includes(
+            (process.env.USE_MOCK_AI || "").toLowerCase()
+        );
+        if (mockMode) {
             return Response.json({ answer: getMockAnswer(question, language), refused: false, mock: true });
         }
 
