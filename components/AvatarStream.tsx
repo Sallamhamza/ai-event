@@ -11,12 +11,13 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import HologramAvatar from "./HologramAvatar";
+import { detectLanguageFromText, type ConciergeLanguage } from "@/lib/language";
 
 // ── Public types ─────────────────────────────────────────────────────────────
 export type AvatarState = "loading" | "ready" | "speaking" | "stopped" | "error";
 
 export interface DIDAvatar {
-  speak: (text: string, lang?: "en" | "ar") => Promise<void>;
+  speak: (text: string, lang?: ConciergeLanguage) => Promise<void>;
   stop:  () => Promise<void>;
 }
 
@@ -29,23 +30,18 @@ interface AvatarStreamProps {
 }
 
 const AGENT_PORTRAIT = "/male-avatar-hologram.png";
-const ARABIC_TEXT = /[\u0600-\u06ff]/;
-
-function resolveSpeechLanguage(text: string, preferred: "en" | "ar" = "en"): "en" | "ar" {
-  return preferred === "ar" || ARABIC_TEXT.test(text) ? "ar" : "en";
-}
 
 // ── Browser TTS — male English / native Arabic ───────────────────────────────
 // Strategy for male English: filter OUT known female voices (works on iOS/Android/Windows)
 // because mobile browsers rarely label voices as "male" by name.
 const FEMALE_VOICE_PATTERN = /female|woman|samantha|victoria|karen|zira|hazel|emma|siri|fiona|moira|tessa|allison|ava|susan|kate|linda|alice|amelie|anna|joana|laura|lekha|luciana|mariska|mei|monica|nora|paulina|satu|sin-ji|soledad|ting-ting|veena|yuna/i;
 
-function browserSpeak(text: string, lang: "en" | "ar" = "en"): Promise<void> {
+function browserSpeak(text: string, lang: ConciergeLanguage = "en"): Promise<void> {
   return new Promise((resolve) => {
     window.speechSynthesis?.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis?.getVoices() ?? [];
-    const speechLang = resolveSpeechLanguage(text, lang);
+    const speechLang = detectLanguageFromText(text, lang);
 
     if (speechLang === "ar") {
       utter.lang  = "ar-SA";
@@ -94,10 +90,16 @@ export default function AvatarStream({
   const updateState = useCallback((s: AvatarState) => onStateChange?.(s), [onStateChange]);
 
   // ── speak: D-ID stream first, browser TTS as fallback ───────────────────────
-  const didSpeak = useCallback(async (text: string, lang: "en" | "ar" = "en") => {
-    const speechLang = resolveSpeechLanguage(text, lang);
+  const didSpeak = useCallback(async (text: string, lang: ConciergeLanguage = "en") => {
+    const speechLang = detectLanguageFromText(text, lang);
     if (streamIdRef.current && sessionIdRef.current) {
       try {
+        if (videoRef.current) {
+          videoRef.current.muted = false;
+          videoRef.current.volume = 1;
+          await videoRef.current.play().catch(() => {});
+        }
+
         const res = await fetch("/api/did-stream/talk", {
           method:  "POST",
           headers: { "Content-Type": "application/json" },

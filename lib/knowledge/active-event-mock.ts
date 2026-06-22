@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { detectLanguageFromText } from "@/lib/language";
 
 export type ConciergeLanguage = "en" | "ar";
 
@@ -157,7 +158,7 @@ export function containsArabicText(value: string): boolean {
 }
 
 export function resolveLanguage(question: string, language: ConciergeLanguage): ConciergeLanguage {
-  return language === "ar" || containsArabicText(question) ? "ar" : "en";
+  return detectLanguageFromText(question, language);
 }
 
 export function getActiveEventRestrictedAnswer(

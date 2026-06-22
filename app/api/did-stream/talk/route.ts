@@ -1,8 +1,9 @@
 // app/api/did-stream/talk/route.ts
 // Sends a text script to D-ID to make the streaming avatar speak.
 
+import { detectLanguageFromText } from "@/lib/language";
+
 const DID_API = "https://api.d-id.com";
-const ARABIC_TEXT = /[\u0600-\u06ff]/;
 
 function authHeader() {
   const key = process.env.DID_API_KEY?.trim();
@@ -13,7 +14,8 @@ function authHeader() {
 export async function POST(req: Request) {
   try {
     const { streamId, sessionId, text, language } = await req.json();
-    const lang = language === "ar" || ARABIC_TEXT.test(String(text ?? "")) ? "ar" : "en";
+    const fallbackLang = language === "ar" ? "ar" : "en";
+    const lang = detectLanguageFromText(String(text ?? ""), fallbackLang);
 
     if (!streamId || !text) {
       return Response.json({ error: "Missing streamId or text" }, { status: 400 });
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
       return Response.json({ error: "Talk request failed", details: data }, { status: res.status });
     }
 
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, language: lang, voice_id: voiceId });
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500 });
   }

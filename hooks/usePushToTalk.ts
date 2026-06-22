@@ -7,6 +7,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import type { DIDAvatar } from "@/components/AvatarStream";
+import { detectLanguageFromText, type ConciergeLanguage } from "@/lib/language";
 
 // ── Female voice blocklist (works on iOS/Android/Windows) ──────────────────────────
 const FEMALE = /female|woman|samantha|victoria|karen|zira|hazel|emma|siri|fiona|moira|tessa|allison|ava|susan|kate|linda|alice|amelie|anna|joana|laura|lekha|luciana|mariska|mei|monica|nora|paulina|satu|sin-ji|soledad|ting-ting|veena|yuna/i;
@@ -22,13 +23,6 @@ const getVoices = () =>
   _cachedVoices.length ? _cachedVoices : (window.speechSynthesis?.getVoices() ?? []);
 
 export type PTTStatus = "idle" | "listening" | "thinking" | "speaking" | "error";
-type ConciergeLanguage = "en" | "ar";
-
-const ARABIC_TEXT = /[\u0600-\u06ff]/;
-
-function resolveSpeechLanguage(text: string, preferred: ConciergeLanguage): ConciergeLanguage {
-  return preferred === "ar" || ARABIC_TEXT.test(text) ? "ar" : "en";
-}
 
 interface UsePushToTalkOptions {
   avatar?:      DIDAvatar | null;
@@ -122,8 +116,8 @@ export function usePushToTalk({
     onTranscript?.(transcript);
     setStatus("thinking");
 
-    // The toggle sets the preferred language. Arabic transcript text always wins.
-    const requestLang = resolveSpeechLanguage(transcript, languageRef.current);
+    // The transcript decides the answer language. The toggle is only a recognition hint.
+    const requestLang = detectLanguageFromText(transcript, languageRef.current);
     onLanguageResolved?.(requestLang);
 
     try {
@@ -133,10 +127,15 @@ export function usePushToTalk({
         body:    JSON.stringify({ question: transcript, language: requestLang }),
       });
       const data   = await res.json();
-      const answer = data.answer ?? "Sorry, I couldn't get an answer. Please try again.";
-      const speechLang = resolveSpeechLanguage(
+      const answer = data.answer ?? (
+        requestLang === "ar"
+          ? "عذرًا، لم أتمكن من الحصول على إجابة. يرجى المحاولة مرة أخرى."
+          : "Sorry, I couldn't get an answer. Please try again."
+      );
+      const answerFallbackLang: ConciergeLanguage = data.language === "ar" ? "ar" : requestLang;
+      const speechLang = detectLanguageFromText(
         answer,
-        data.language === "ar" ? "ar" : requestLang
+        answerFallbackLang
       );
       onLanguageResolved?.(speechLang);
       onAnswer?.(answer);

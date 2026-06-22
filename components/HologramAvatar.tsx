@@ -332,7 +332,6 @@ export default function HologramAvatar({
               className="cyber-avatar__media cyber-avatar__video"
               autoPlay
               playsInline
-              muted
             />
             <div className="cyber-avatar__overlay glow" aria-hidden />
             <div className="cyber-avatar__overlay scan" aria-hidden />
