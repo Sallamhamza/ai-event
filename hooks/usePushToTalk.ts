@@ -207,7 +207,7 @@ export function usePushToTalk({
     }
 
     setLiveTranscript("");
-  }, [status, liveTranscript, avatar, language, onTranscript, onAnswer, onLanguageDetected]);
+  }, [status, liveTranscript, avatar, onTranscript, onAnswer, onLanguageDetected]);
 
   // ── Reset ───────────────────────────────────────────────────────────────
   const reset = useCallback(() => {

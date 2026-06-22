@@ -1,3 +1,4 @@
+import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   buildActiveEventSystemPrompt,
@@ -20,6 +21,8 @@ function jsonAnswer(payload: {
   refused?: boolean;
   mock?: boolean;
   fallback?: boolean;
+  provider?: "openai" | "gemini" | "mock";
+  model?: string;
 }) {
   return Response.json({
     ...payload,
@@ -46,6 +49,7 @@ function buildUserPrompt(question: string, language: ConciergeLanguage): string 
     return [
       "أجب باللغة العربية فقط.",
       "استخدم الإنجليزية فقط لأسماء القاعات أو العلامات التجارية أو الاختصارات الرسمية مثل Ballroom A أو CPD.",
+      "اكتب كنص عادي مناسب للصوت. لا تستخدم Markdown أو النجوم أو التنسيق الغامق أو الجداول.",
       "إذا لم تكن المعلومة موجودة في JSON الفعالية، قل ذلك بالعربية ووجّه الزائر إلى مكتب المعلومات.",
       "",
       `سؤال الزائر: ${question}`,
@@ -55,9 +59,19 @@ function buildUserPrompt(question: string, language: ConciergeLanguage): string 
   return [
     "Answer in English only.",
     "Use only the active event JSON from the system instructions.",
+    "Write plain speech-friendly text only. Do not use Markdown, asterisks, bold formatting, tables, or bullet lists.",
     "",
     `Delegate question: ${question}`,
   ].join("\n");
+}
+
+function cleanForSpeech(answer: string): string {
+  return answer
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function enforceAnswerLanguage(
@@ -66,7 +80,7 @@ function enforceAnswerLanguage(
   language: ConciergeLanguage,
   knowledge: ActiveEventKnowledge
 ): { answer: string; fallback: boolean } {
-  const trimmed = answer.trim();
+  const trimmed = cleanForSpeech(answer);
   if (!trimmed) {
     return {
       answer: getActiveEventMockAnswer(question, language, knowledge),
@@ -75,7 +89,7 @@ function enforceAnswerLanguage(
   }
 
   if (language === "ar" && !containsArabicText(trimmed)) {
-    console.warn("Gemini returned a non-Arabic answer for an Arabic request; using active-event Arabic fallback.");
+    console.warn("AI provider returned a non-Arabic answer for an Arabic request; using active-event Arabic fallback.");
     return {
       answer: getActiveEventMockAnswer(question, "ar", knowledge),
       fallback: true,
@@ -124,17 +138,45 @@ export async function POST(request: Request) {
         language,
         refused: false,
         mock: true,
+        provider: "mock",
+      });
+    }
+
+    const openAIKey = process.env.OPENAI_API_KEY?.trim();
+    if (openAIKey) {
+      const openAIModel = process.env.OPENAI_MODEL?.trim() || "gpt-5.4-mini";
+      const client = new OpenAI({ apiKey: openAIKey });
+      const response = await client.responses.create({
+        model: openAIModel,
+        instructions: buildActiveEventSystemPrompt(knowledge, language),
+        input: buildUserPrompt(question, language),
+      });
+      const checkedAnswer = enforceAnswerLanguage(
+        response.output_text,
+        question,
+        language,
+        knowledge
+      );
+
+      return jsonAnswer({
+        answer: checkedAnswer.answer,
+        language,
+        refused: false,
+        fallback: checkedAnswer.fallback || undefined,
+        provider: "openai",
+        model: openAIModel,
       });
     }
 
     const geminiKey = process.env.GEMINI_API_KEY?.trim();
     if (!geminiKey) {
-      console.warn("GEMINI_API_KEY not set - using active-event mock answers");
+      console.warn("OPENAI_API_KEY and GEMINI_API_KEY not set - using active-event mock answers");
       return jsonAnswer({
         answer: getActiveEventMockAnswer(question, language, knowledge),
         language,
         refused: false,
         mock: true,
+        provider: "mock",
       });
     }
 
@@ -157,6 +199,8 @@ export async function POST(request: Request) {
       language,
       refused: false,
       fallback: checkedAnswer.fallback || undefined,
+      provider: "gemini",
+      model: "gemini-2.0-flash",
     });
   } catch (error: unknown) {
     console.error("Ask route error:", error);
