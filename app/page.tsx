@@ -6,10 +6,11 @@ import PushToTalkButton from "@/components/PushToTalkButton";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
 
 export default function KioskPage() {
-  const [avatar, setAvatar] = useState<DIDAvatar | null>(null);
+  const [avatar,   setAvatar]   = useState<DIDAvatar | null>(null);
   const [streamId, setStreamId] = useState<string | null>(null);
   const [transcript, setTranscript] = useState("");
-  const [answer, setAnswer] = useState("");
+  const [answer,     setAnswer]     = useState("");
+  const [lang,       setLang]       = useState<"en" | "ar">("en");
 
   const handleAvatarReady = useCallback((av: DIDAvatar, sid?: string) => {
     setAvatar(av);
@@ -19,6 +20,7 @@ export default function KioskPage() {
   const { status, liveTranscript, error, startListening, stopListening, reset } =
     usePushToTalk({
       avatar,
+      language: lang,
       onTranscript: (text) => {
         setTranscript(text);
         setAnswer("");
@@ -37,10 +39,13 @@ export default function KioskPage() {
   }, [avatar, status, streamId]);
 
   const assistantCopy = useMemo(() => {
-    if (status === "thinking" && !answer) return "Scanning the event knowledge base...";
+    if (status === "thinking" && !answer)
+      return lang === "ar" ? "جارٍ البحث في قاعدة معلومات الفعالية..." : "Scanning the event knowledge base...";
     if (answer) return answer;
-    return "I can help with the agenda, speakers, registration, venue directions, transport, WiFi, and event services.";
-  }, [answer, status]);
+    return lang === "ar"
+      ? "يمكنني مساعدتك بالجدول، المتحدثين، التسجيل، الموقع، المواصلات، الواي فاي وخدمات الفعالية."
+      : "I can help with the agenda, speakers, registration, venue directions, transport, WiFi, and event services.";
+  }, [answer, status, lang]);
 
   return (
     <main className="concierge-page">
@@ -525,6 +530,26 @@ export default function KioskPage() {
             </div>
             <div className="top-actions">
               <button
+                className={`icon-button lang-toggle`}
+                type="button"
+                aria-label="Toggle language Arabic / English"
+                onClick={() => setLang(l => l === "en" ? "ar" : "en")}
+                style={{
+                  fontSize: "11px", fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  padding: "4px 10px",
+                  border: "1px solid rgba(32,223,255,0.35)",
+                  borderRadius: "999px",
+                  background: lang === "ar" ? "rgba(32,223,255,0.15)" : "transparent",
+                  color: "var(--cyan)",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  minWidth: 44,
+                }}
+              >
+                {lang === "en" ? "عربي" : "EN"}
+              </button>
+              <button
                 className="icon-button icon-button--mute"
                 type="button"
                 aria-label="Mute or stop avatar audio"
@@ -551,8 +576,8 @@ export default function KioskPage() {
 
           <section className="conversation" aria-live="polite" aria-label="Conversation">
             <div className="bubble bubble-user">
-              <span className="bubble-label">You</span>
-              <p>{displayTranscript || "What are the main highlights of this event?"}</p>
+              <span className="bubble-label">{lang === "ar" ? "أنت" : "You"}</span>
+              <p>{displayTranscript || (lang === "ar" ? "ما هي أبرز مميزات هذه الفعالية؟" : "What are the main highlights of this event?")}</p>
             </div>
 
             <div className="bubble bubble-aivent">
