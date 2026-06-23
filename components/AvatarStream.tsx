@@ -30,6 +30,21 @@ interface AvatarStreamProps {
 }
 
 const AGENT_PORTRAIT = "/male-avatar-hologram.png";
+let voiceCache: SpeechSynthesisVoice[] = [];
+
+function getBrowserVoices(): SpeechSynthesisVoice[] {
+  if (voiceCache.length) return voiceCache;
+  voiceCache = window.speechSynthesis?.getVoices() ?? [];
+  return voiceCache;
+}
+
+if (typeof window !== "undefined" && window.speechSynthesis) {
+  const refreshVoices = () => {
+    voiceCache = window.speechSynthesis.getVoices();
+  };
+  refreshVoices();
+  window.speechSynthesis.addEventListener("voiceschanged", refreshVoices);
+}
 
 // ── Browser TTS — male English / native Arabic ───────────────────────────────
 // Strategy for male English: filter OUT known female voices (works on iOS/Android/Windows)
@@ -40,7 +55,7 @@ function browserSpeak(text: string, lang: ConciergeLanguage = "en"): Promise<voi
   return new Promise((resolve) => {
     window.speechSynthesis?.cancel();
     const utter = new SpeechSynthesisUtterance(text);
-    const voices = window.speechSynthesis?.getVoices() ?? [];
+    const voices = getBrowserVoices();
     const speechLang = detectLanguageFromText(text, lang);
 
     if (speechLang === "ar") {
@@ -92,6 +107,16 @@ export default function AvatarStream({
   // ── speak: D-ID stream first, browser TTS as fallback ───────────────────────
   const didSpeak = useCallback(async (text: string, lang: ConciergeLanguage = "en") => {
     const speechLang = detectLanguageFromText(text, lang);
+
+    // D-ID can accept an Arabic talk request while still rendering the stream
+    // with an English-only voice on some setups. For Arabic, prefer native TTS
+    // so the spoken language always matches the answer text.
+    if (speechLang === "ar") {
+      if (videoRef.current) videoRef.current.muted = true;
+      await browserSpeak(text, speechLang);
+      return;
+    }
+
     if (streamIdRef.current && sessionIdRef.current) {
       try {
         if (videoRef.current) {
