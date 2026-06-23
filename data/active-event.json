@@ -294,8 +294,8 @@
 "How many credits do I get?",
 "كم عدد ساعات الاعتماد؟"
 ],
-"answer_en": "The mock event content lists 8 CPD credits over two days, subject to attendance confirmation at the registration desk each day.",
-"answer_ar": "توضح بيانات الفعالية التجريبية أن إجمالي الاعتماد هو 8 ساعات CPD على مدى يومين، بشرط تأكيد الحضور في مكتب التسجيل كل يوم."
+"answer_en": "The event content lists 8 CPD credits over two days, subject to attendance confirmation at the registration desk each day.",
+"answer_ar": "توضح بيانات الفعالية أن إجمالي الاعتماد هو 8 ساعات CPD على مدى يومين، بشرط تأكيد الحضور في مكتب التسجيل كل يوم."
 },
 {
 "intent": "gala_dinner",
@@ -357,11 +357,11 @@
 "conversation": [
 {
 "attendee": "Hi, I just arrived. Where should I go first?",
-"nour": "Welcome to Gulf Pharma Connect 2026. Please proceed to the Grand Foyer on the ground floor to collect your badge from the registration desk. After that, you can follow the signs to Ballroom A for the opening sessions."
+"aivent": "Welcome to Gulf Pharma Connect 2026. Please proceed to the Grand Foyer on the ground floor to collect your badge from the registration desk. After that, you can follow the signs to Ballroom A for the opening sessions."
 },
 {
 "attendee": "Is the keynote already started?",
-"nour": "The opening keynote starts at 09:00 in Ballroom A. If you are arriving after that time, please collect your badge first and enter quietly through the main Ballroom A entrance."
+"aivent": "The opening keynote starts at 09:00 in Ballroom A. If you are arriving after that time, please collect your badge first and enter quietly through the main Ballroom A entrance."
 }
 ]
 },
@@ -370,11 +370,11 @@
 "conversation": [
 {
 "attendee": "What is the session after coffee break on Day 1?",
-"nour": "After the 11:00 coffee break on Day 1, the Workshop: Digital Health Adoption starts at 11:20 in Room 4."
+"aivent": "After the 11:00 coffee break on Day 1, the Workshop: Digital Health Adoption starts at 11:20 in Room 4."
 },
 {
 "attendee": "Where is Room 4?",
-"nour": "From the Foyer, follow the corridor signs toward Meeting Rooms 1–5. Room 4 is near the end of the corridor."
+"aivent": "From the Foyer, follow the corridor signs toward Meeting Rooms 1–5. Room 4 is near the end of the corridor."
 }
 ]
 },
@@ -383,11 +383,11 @@
 "conversation": [
 {
 "attendee": "أين المحاضرة الرئيسية؟",
-"nour": "المحاضرة الرئيسية تُعقد في Ballroom A. إذا كنت عند مكتب التسجيل، فهي مباشرة أمامك بعد منطقة القهوة."
+"aivent": "المحاضرة الرئيسية تُعقد في Ballroom A. إذا كنت عند مكتب التسجيل، فهي مباشرة أمامك بعد منطقة القهوة."
 },
 {
 "attendee": "متى يبدأ الغداء؟",
-"nour": "في اليوم الأول يبدأ الغداء الساعة 13:00 في Garden Hall. وفي اليوم الثاني يبدأ الساعة 12:00 في نفس القاعة."
+"aivent": "في اليوم الأول يبدأ الغداء الساعة 13:00 في Garden Hall. وفي اليوم الثاني يبدأ الساعة 12:00 في نفس القاعة."
 }
 ]
 },
@@ -396,11 +396,11 @@
 "conversation": [
 {
 "attendee": "Can you tell me if Cardivex has side effects?",
-"nour": "I’m sorry, I cannot answer safety or side-effect questions. Please visit the medical information desk at Booth M1 or speak with the official medical representative."
+"aivent": "I am AIVENT, and I cannot answer safety or side-effect questions. Please visit the medical information desk at Booth M1 or speak with the official medical representative."
 },
 {
 "attendee": "Can you at least tell me where Cardivex is discussed?",
-"nour": "Yes. Cardivex is referenced in the Day 1 symposium on cardiovascular co-morbidities connected to the Oncology Pipeline Updates session in Ballroom A."
+"aivent": "Yes. Cardivex is referenced in the Day 1 symposium on cardiovascular co-morbidities connected to the Oncology Pipeline Updates session in Ballroom A."
 }
 ]
 },
@@ -409,11 +409,11 @@
 "conversation": [
 {
 "attendee": "How do I get back to the airport?",
-"nour": "The transport desk in the Foyer can help with shuttle changes and taxi arrangements. The estimated taxi fare to Dubai International Airport is AED 80 to 100."
+"aivent": "The transport desk in the Foyer can help with shuttle changes and taxi arrangements. The estimated taxi fare to Dubai International Airport is AED 80 to 100."
 },
 {
 "attendee": "Is there a shuttle to the metro?",
-"nour": "Yes, the hotel shuttle runs every 30 minutes between Conrad Dubai and DIFC Metro station."
+"aivent": "Yes, the hotel shuttle runs every 30 minutes between Conrad Dubai and DIFC Metro station."
 }
 ]
 }
