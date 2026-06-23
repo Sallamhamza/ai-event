@@ -99,10 +99,59 @@ export default function AvatarStream({
   const pcRef        = useRef<RTCPeerConnection | null>(null);
   const streamIdRef  = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const generatedAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const [isConnecting, setIsConnecting] = useState(enabled);
 
   const updateState = useCallback((s: AvatarState) => onStateChange?.(s), [onStateChange]);
+
+  const stopGeneratedAudio = useCallback(() => {
+    const audio = generatedAudioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.src = "";
+    generatedAudioRef.current = null;
+  }, []);
+
+  const playGeneratedSpeech = useCallback(async (
+    text: string,
+    lang: ConciergeLanguage
+  ): Promise<boolean> => {
+    stopGeneratedAudio();
+    let objectUrl: string | null = null;
+
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, language: lang }),
+      });
+
+      if (!res.ok) return false;
+
+      const blob = await res.blob();
+      objectUrl = URL.createObjectURL(blob);
+      const audio = new Audio(objectUrl);
+      generatedAudioRef.current = audio;
+
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => resolve();
+        audio.onerror = () => reject(new Error("Generated speech playback failed"));
+        audio.play().catch(reject);
+      });
+
+      return true;
+    } catch {
+      return false;
+    } finally {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+      if (generatedAudioRef.current?.src === objectUrl) {
+        generatedAudioRef.current = null;
+      }
+    }
+  }, [stopGeneratedAudio]);
 
   // ── speak: D-ID stream first, browser TTS as fallback ───────────────────────
   const didSpeak = useCallback(async (text: string, lang: ConciergeLanguage = "en") => {
@@ -113,9 +162,13 @@ export default function AvatarStream({
     // so the spoken language always matches the answer text.
     if (speechLang === "ar") {
       if (videoRef.current) videoRef.current.muted = true;
+      const spoken = await playGeneratedSpeech(text, speechLang);
+      if (spoken) return;
       await browserSpeak(text, speechLang);
       return;
     }
+
+    stopGeneratedAudio();
 
     if (streamIdRef.current && sessionIdRef.current) {
       try {
@@ -139,17 +192,18 @@ export default function AvatarStream({
       } catch { /* fall through to TTS */ }
     }
     await browserSpeak(text, speechLang);
-  }, []);
+  }, [playGeneratedSpeech, stopGeneratedAudio]);
 
   const didStop = useCallback(async () => {
     window.speechSynthesis?.cancel();
+    stopGeneratedAudio();
     if (!streamIdRef.current) return;
     await fetch("/api/did-stream/close", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ streamId: streamIdRef.current, sessionId: sessionIdRef.current }),
     }).catch(() => {});
-  }, []);
+  }, [stopGeneratedAudio]);
 
   // ── WebRTC session lifecycle ─────────────────────────────────────────────────
   useEffect(() => {

@@ -10,6 +10,9 @@ export async function GET() {
   const didAgent   = process.env.DID_AGENT_ID?.trim() || "";
   const didVoiceEn = process.env.DID_VOICE_ID?.trim() || "";
   const didVoiceAr = process.env.DID_VOICE_ID_AR?.trim() || "";
+  const openAITtsModel = process.env.OPENAI_TTS_MODEL?.trim() || "gpt-4o-mini-tts";
+  const openAITtsVoiceAr = process.env.OPENAI_TTS_VOICE_AR?.trim() || "cedar";
+  const openAITtsVoiceEn = process.env.OPENAI_TTS_VOICE_EN?.trim() || "onyx";
   const useMock    = process.env.USE_MOCK_AI || "not set";
 
   return Response.json({
@@ -18,6 +21,9 @@ export async function GET() {
     has_openai_key:   Boolean(openAIKey),
     openai_key_last4: openAIKey ? openAIKey.slice(-4) : null,
     openai_model:     openAIModel,
+    openai_tts_model: openAITtsModel,
+    openai_tts_voice_ar: openAITtsVoiceAr,
+    openai_tts_voice_en: openAITtsVoiceEn,
     has_gemini_key:   Boolean(geminiKey),
     gemini_key_last4: geminiKey ? geminiKey.slice(-4) : null,
     has_did_key:      Boolean(didKey),
@@ -34,6 +40,7 @@ export async function GET() {
       "/api/ask",
       "/api/concierge",
       "/api/did-stream/talk",
+      "/api/tts",
     ],
   });
 }
