@@ -6,8 +6,8 @@
 // This component owns:
 //   • the <video> element (via videoRef)
 //   • the WebRTC / D-ID stream session lifecycle
-//   • the speak/stop API calls
-//   • browser-TTS fallback when D-ID stream is unavailable
+//   • generated speech playback through /api/tts
+//   • browser-TTS fallback when generated speech is unavailable
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import HologramAvatar from "./HologramAvatar";
@@ -153,46 +153,15 @@ export default function AvatarStream({
     }
   }, [stopGeneratedAudio]);
 
-  // ── speak: D-ID stream first, browser TTS as fallback ───────────────────────
+  // ── speak: generated speech first, browser TTS as fallback ─────────────────
   const didSpeak = useCallback(async (text: string, lang: ConciergeLanguage = "en") => {
     const speechLang = detectLanguageFromText(text, lang);
 
-    // D-ID can accept an Arabic talk request while still rendering the stream
-    // with an English-only voice on some setups. For Arabic, prefer native TTS
-    // so the spoken language always matches the answer text.
-    if (speechLang === "ar") {
-      if (videoRef.current) videoRef.current.muted = true;
-      const spoken = await playGeneratedSpeech(text, speechLang);
-      if (spoken) return;
-      await browserSpeak(text, speechLang);
-      return;
-    }
-
-    stopGeneratedAudio();
-
-    if (streamIdRef.current && sessionIdRef.current) {
-      try {
-        if (videoRef.current) {
-          videoRef.current.muted = false;
-          videoRef.current.volume = 1;
-          await videoRef.current.play().catch(() => {});
-        }
-
-        const res = await fetch("/api/did-stream/talk", {
-          method:  "POST",
-          headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({
-            streamId:  streamIdRef.current,
-            sessionId: sessionIdRef.current,
-            text,
-            language:  speechLang,
-          }),
-        });
-        if (res.ok) return;                // D-ID replied — video will animate
-      } catch { /* fall through to TTS */ }
-    }
+    if (videoRef.current) videoRef.current.muted = true;
+    const spoken = await playGeneratedSpeech(text, speechLang);
+    if (spoken) return;
     await browserSpeak(text, speechLang);
-  }, [playGeneratedSpeech, stopGeneratedAudio]);
+  }, [playGeneratedSpeech]);
 
   const didStop = useCallback(async () => {
     window.speechSynthesis?.cancel();
