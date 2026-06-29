@@ -1,9 +1,19 @@
 // app/api/did-stream/talk/route.ts
 // Sends a text script to D-ID to make the streaming avatar speak.
 
+import {
+  asRecord,
+  checkRateLimit,
+  enforceSameOrigin,
+  readJsonBody,
+  requiredSafeId,
+  requiredString,
+} from "@/lib/api-security";
 import { resolveDidSpeech } from "@/lib/did-voice";
 
 const DID_API = "https://api.d-id.com";
+const MAX_TALK_BODY_BYTES = 6_000;
+const MAX_TALK_TEXT_CHARS = 1_500;
 
 function authHeader() {
   const key = process.env.DID_API_KEY?.trim();
@@ -13,16 +23,36 @@ function authHeader() {
 
 export async function POST(req: Request) {
   try {
-    const { streamId, sessionId, text, language } = await req.json();
-    const fallbackLang = language === "ar" ? "ar" : "en";
-    const speech = resolveDidSpeech(String(text ?? ""), fallbackLang);
+    const originGuard = enforceSameOrigin(req);
+    if (originGuard) return originGuard;
 
-    if (!streamId || !text) {
-      return Response.json({ error: "Missing streamId or text" }, { status: 400 });
-    }
+    const rateLimit = checkRateLimit(req, {
+      key: "did-stream-talk",
+      limit: 20,
+      windowMs: 60_000,
+    });
+    if (rateLimit) return rateLimit;
+
+    const bodyResult = await readJsonBody(req, { maxBytes: MAX_TALK_BODY_BYTES });
+    if (!bodyResult.ok) return bodyResult.response;
+
+    const body = asRecord(bodyResult.data);
+    if (!body) return Response.json({ error: "Invalid request body" }, { status: 400 });
+
+    const streamId = requiredSafeId(body.streamId, "streamId");
+    if (!streamId.ok) return streamId.response;
+
+    const sessionId = requiredString(body.sessionId, "sessionId", 200);
+    if (!sessionId.ok) return sessionId.response;
+
+    const text = requiredString(body.text, "text", MAX_TALK_TEXT_CHARS);
+    if (!text.ok) return text.response;
+
+    const fallbackLang = body.language === "ar" ? "ar" : "en";
+    const speech = resolveDidSpeech(text.value, fallbackLang);
 
     // Male voices: English = GuyNeural, Arabic = HamedNeural
-    const res = await fetch(`${DID_API}/talks/streams/${streamId}`, {
+    const res = await fetch(`${DID_API}/talks/streams/${streamId.value}`, {
       method: "POST",
       headers: {
         Authorization: authHeader(),
@@ -31,11 +61,11 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         script: {
           type:     "text",
-          input:    text,
+          input:    text.value,
           provider: { type: "microsoft", voice_id: speech.voiceId },
         },
         config:     { stitch: true },
-        session_id: sessionId,
+        session_id: sessionId.value,
       }),
     });
 

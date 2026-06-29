@@ -5,7 +5,16 @@
 // POST   /api/did-stream          → create a new D-ID stream session
 // DELETE /api/did-stream          → close an existing session
 
+import {
+  asRecord,
+  checkRateLimit,
+  enforceSameOrigin,
+  readJsonBody,
+  requiredSafeId,
+} from "@/lib/api-security";
+
 const DID_API = "https://api.d-id.com";
+const MAX_CLOSE_BODY_BYTES = 1_000;
 
 function authHeader() {
   const key = process.env.DID_API_KEY?.trim();
@@ -16,8 +25,18 @@ function authHeader() {
 }
 
 // ── POST: create stream ───────────────────────────────────────────────────────
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const originGuard = enforceSameOrigin(request);
+    if (originGuard) return originGuard;
+
+    const rateLimit = checkRateLimit(request, {
+      key: "did-stream-create",
+      limit: 6,
+      windowMs: 5 * 60_000,
+    });
+    if (rateLimit) return rateLimit;
+
     const presenterUrl =
       process.env.DID_PRESENTER_URL?.trim() ||
       "https://d-id-public-bucket.s3.amazonaws.com/alice.jpg";
@@ -64,10 +83,19 @@ export async function POST() {
 // ── DELETE: close stream ──────────────────────────────────────────────────────
 export async function DELETE(req: Request) {
   try {
-    const { streamId, sessionId } = await req.json();
-    if (!streamId) return Response.json({ ok: true }); // nothing to close
+    const originGuard = enforceSameOrigin(req);
+    if (originGuard) return originGuard;
 
-    await fetch(`${DID_API}/talks/streams/${streamId}`, {
+    const bodyResult = await readJsonBody(req, { maxBytes: MAX_CLOSE_BODY_BYTES });
+    if (!bodyResult.ok) return bodyResult.response;
+
+    const body = asRecord(bodyResult.data);
+    const streamId = requiredSafeId(body?.streamId, "streamId");
+    if (!streamId.ok) return Response.json({ ok: true });
+
+    const sessionId = typeof body?.sessionId === "string" ? body.sessionId.trim() : undefined;
+
+    await fetch(`${DID_API}/talks/streams/${streamId.value}`, {
       method: "DELETE",
       headers: {
         Authorization: authHeader(),

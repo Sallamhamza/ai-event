@@ -2,7 +2,10 @@
 // Called via navigator.sendBeacon on page unload — must be POST.
 // Closes an active D-ID stream session so it doesn't count against the concurrent limit.
 
+import { asRecord, enforceSameOrigin, readJsonBody, requiredSafeId } from "@/lib/api-security";
+
 const DID_API = "https://api.d-id.com";
+const MAX_CLOSE_BODY_BYTES = 1_000;
 
 function authHeader() {
   const key = process.env.DID_API_KEY?.trim();
@@ -12,11 +15,19 @@ function authHeader() {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const { streamId, sessionId } = body;
-    if (!streamId) return new Response("ok", { status: 200 });
+    const originGuard = enforceSameOrigin(req);
+    if (originGuard) return originGuard;
 
-    await fetch(`${DID_API}/talks/streams/${streamId}`, {
+    const bodyResult = await readJsonBody(req, { maxBytes: MAX_CLOSE_BODY_BYTES });
+    if (!bodyResult.ok) return new Response("ok", { status: 200 });
+
+    const body = asRecord(bodyResult.data);
+    const streamId = requiredSafeId(body?.streamId, "streamId");
+    if (!streamId.ok) return new Response("ok", { status: 200 });
+
+    const sessionId = typeof body?.sessionId === "string" ? body.sessionId.trim() : undefined;
+
+    await fetch(`${DID_API}/talks/streams/${streamId.value}`, {
       method: "DELETE",
       headers: {
         Authorization: authHeader(),

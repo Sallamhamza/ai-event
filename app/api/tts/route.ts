@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { asRecord, checkRateLimit, enforceSameOrigin, readJsonBody } from "@/lib/api-security";
 import { containsArabicText, type ConciergeLanguage } from "@/lib/language";
 
 export const runtime = "nodejs";
@@ -7,6 +8,7 @@ const TTS_MODEL = "gpt-4o-mini-tts";
 const DEFAULT_ARABIC_VOICE = "cedar";
 const DEFAULT_ENGLISH_VOICE = "onyx";
 const MAX_TTS_CHARS = 4096;
+const MAX_TTS_BODY_BYTES = 10_000;
 
 const SUPPORTED_VOICES = [
   "alloy",
@@ -192,13 +194,34 @@ function buildInstructions(language: ConciergeLanguage): string {
 
 export async function POST(request: Request) {
   try {
+    const originGuard = enforceSameOrigin(request);
+    if (originGuard) return originGuard;
+
+    const rateLimit = checkRateLimit(request, {
+      key: "tts",
+      limit: 20,
+      windowMs: 60_000,
+    });
+    if (rateLimit) return rateLimit;
+
     const apiKey = process.env.OPENAI_API_KEY?.trim();
     if (!apiKey) {
       return Response.json({ error: "Missing OPENAI_API_KEY" }, { status: 500 });
     }
 
-    const body = await request.json();
-    const text = String(body.text || "").trim();
+    const bodyResult = await readJsonBody(request, { maxBytes: MAX_TTS_BODY_BYTES });
+    if (!bodyResult.ok) return bodyResult.response;
+
+    const body = asRecord(bodyResult.data);
+    if (!body) {
+      return Response.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    if (typeof body.text !== "string") {
+      return Response.json({ error: "Missing text" }, { status: 400 });
+    }
+
+    const text = body.text.trim();
     const fallbackLanguage: ConciergeLanguage = body.language === "ar" ? "ar" : "en";
     const language = resolveLanguage(text, fallbackLanguage);
 

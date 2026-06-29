@@ -37,18 +37,28 @@ export default function HologramAvatar({
     if (!video) return;
 
     let attempts = 0;
-    const maxAttempts = 150;
+    const maxAttempts = 90;
+    let interval: number | undefined;
+
+    const stopPolling = () => {
+      if (interval === undefined) return;
+      window.clearInterval(interval);
+      interval = undefined;
+    };
 
     const inspect = () => {
       if (!mounted.current) return;
       const hasFrames = video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0;
       setHasLiveFrames(hasFrames);
       setTimedOut(!hasFrames && !isConnecting && attempts >= maxAttempts);
+      if (hasFrames || (!hasFrames && !isConnecting && attempts >= maxAttempts)) {
+        stopPolling();
+      }
       attempts += 1;
     };
 
     inspect();
-    const interval = window.setInterval(inspect, 140);
+    interval = window.setInterval(inspect, 220);
     video.addEventListener("loadedmetadata", inspect);
     video.addEventListener("canplay", inspect);
 
@@ -63,7 +73,7 @@ export default function HologramAvatar({
     video.addEventListener("emptied", fail);
 
     return () => {
-      window.clearInterval(interval);
+      stopPolling();
       video.removeEventListener("loadedmetadata", inspect);
       video.removeEventListener("canplay", inspect);
       video.removeEventListener("error", fail);
@@ -325,7 +335,6 @@ export default function HologramAvatar({
               fill
               sizes="370px"
               priority
-              unoptimized
             />
             <video
               ref={videoRef as React.RefObject<HTMLVideoElement>}

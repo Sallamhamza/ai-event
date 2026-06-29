@@ -19,3 +19,10 @@ export function detectLanguageFromText(
   if (containsLatinText(value)) return "en";
   return fallback;
 }
+
+export function detectSpokenLanguage(
+  value: string,
+  fallback: ConciergeLanguage = "en"
+): ConciergeLanguage {
+  return containsArabicText(value) ? "ar" : fallback;
+}

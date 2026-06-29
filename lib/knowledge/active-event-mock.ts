@@ -1,7 +1,9 @@
 import fs from "fs";
 import path from "path";
-
-export type ConciergeLanguage = "en" | "ar";
+import {
+  detectSpokenLanguage,
+  type ConciergeLanguage,
+} from "@/lib/language";
 
 interface SafeBoundaries {
   restricted?: string[];
@@ -88,6 +90,7 @@ interface CommonQuestion {
 
 interface SampleTurn {
   attendee?: string;
+  aivent?: string;
   nour?: string;
 }
 
@@ -134,6 +137,10 @@ interface Candidate {
 }
 
 const ARABIC_RE = /[\u0600-\u06ff]/;
+const KNOWLEDGE_CACHE_TTL_MS = 30_000;
+
+let cachedKnowledge: ActiveEventKnowledge | null = null;
+let cachedKnowledgeExpiresAt = 0;
 
 const EN_STOPWORDS = new Set([
   "the", "and", "for", "with", "what", "where", "when", "how", "can",
@@ -147,17 +154,20 @@ const AR_STOPWORDS = new Set([
 ]);
 
 export function loadActiveEventKnowledge(): ActiveEventKnowledge {
+  const now = Date.now();
+  if (cachedKnowledge && cachedKnowledgeExpiresAt > now) {
+    return cachedKnowledge;
+  }
+
   const filePath = path.join(process.cwd(), "data", "active-event.json");
   const raw = fs.readFileSync(filePath, "utf-8");
-  return JSON.parse(raw) as ActiveEventKnowledge;
-}
-
-export function containsArabicText(value: string): boolean {
-  return ARABIC_RE.test(value);
+  cachedKnowledge = JSON.parse(raw) as ActiveEventKnowledge;
+  cachedKnowledgeExpiresAt = now + KNOWLEDGE_CACHE_TTL_MS;
+  return cachedKnowledge;
 }
 
 export function resolveLanguage(question: string, language: ConciergeLanguage): ConciergeLanguage {
-  return language === "ar" || containsArabicText(question) ? "ar" : "en";
+  return detectSpokenLanguage(question, language);
 }
 
 export function getActiveEventIdentityAnswer(
@@ -356,12 +366,13 @@ function findSampleDialogueAnswer(
 
   for (const dialogue of knowledge.sample_dialogues ?? []) {
     for (const turn of dialogue.conversation ?? []) {
-      if (!turn.attendee || !turn.nour) continue;
-      if (lang === "ar" && !ARABIC_RE.test(turn.nour)) continue;
-      if (lang === "en" && ARABIC_RE.test(turn.nour)) continue;
+      const assistantAnswer = turn.aivent ?? turn.nour;
+      if (!turn.attendee || !assistantAnswer) continue;
+      if (lang === "ar" && !ARABIC_RE.test(assistantAnswer)) continue;
+      if (lang === "en" && ARABIC_RE.test(assistantAnswer)) continue;
 
       const score = scoreCandidate(question, `${dialogue.title ?? ""} ${turn.attendee}`);
-      if (!best || score > best.score) best = { score, answer: turn.nour };
+      if (!best || score > best.score) best = { score, answer: assistantAnswer };
     }
   }
 

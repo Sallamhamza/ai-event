@@ -1,8 +1,9 @@
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { asRecord, checkRateLimit, enforceSameOrigin, readJsonBody } from "@/lib/api-security";
+import { containsArabicText, type ConciergeLanguage } from "@/lib/language";
 import {
   buildActiveEventSystemPrompt,
-  containsArabicText,
   getActiveEventIdentityAnswer,
   getActiveEventMockAnswer,
   getActiveEventOutOfScopeAnswer,
@@ -10,12 +11,14 @@ import {
   loadActiveEventKnowledge,
   resolveLanguage,
   type ActiveEventKnowledge,
-  type ConciergeLanguage,
 } from "@/lib/knowledge/active-event-mock";
 
 function isTruthy(value: string | undefined): boolean {
   return ["true", "1", "yes"].includes((value || "").toLowerCase());
 }
+
+const MAX_QUESTION_CHARS = 1200;
+const MAX_ASK_BODY_BYTES = 6_000;
 
 function jsonAnswer(payload: {
   answer: string;
@@ -30,6 +33,76 @@ function jsonAnswer(payload: {
     ...payload,
     knowledge: "active-event",
   });
+}
+
+function jsonRequestError(answer: string, language: ConciergeLanguage) {
+  return Response.json(
+    {
+      answer,
+      language,
+      error: "Invalid request",
+      knowledge: "active-event",
+    },
+    { status: 400 }
+  );
+}
+
+async function parseAskRequest(request: Request): Promise<
+  | { ok: true; question: string; language: ConciergeLanguage }
+  | { ok: false; response: Response }
+> {
+  const bodyResult = await readJsonBody(request, {
+    maxBytes: MAX_ASK_BODY_BYTES,
+    invalidMessage: "Please send a valid JSON request.",
+  });
+  if (!bodyResult.ok) return bodyResult;
+
+  const payload = asRecord(bodyResult.data);
+  if (!payload) {
+    return {
+      ok: false,
+      response: jsonRequestError("Please send a valid question.", "en"),
+    };
+  }
+
+  const fallbackLanguage: ConciergeLanguage = payload.language === "ar" ? "ar" : "en";
+
+  if (typeof payload.question !== "string") {
+    return {
+      ok: false,
+      response: jsonRequestError(
+        fallbackLanguage === "ar" ? "يرجى إرسال السؤال كنص." : "Please send the question as text.",
+        fallbackLanguage
+      ),
+    };
+  }
+
+  const question = payload.question.trim();
+  const language = resolveLanguage(question, fallbackLanguage);
+
+  if (!question) {
+    return {
+      ok: false,
+      response: jsonRequestError(
+        language === "ar" ? "يرجى طرح سؤال عن الفعالية." : "Please ask a question about the event.",
+        language
+      ),
+    };
+  }
+
+  if (question.length > MAX_QUESTION_CHARS) {
+    return {
+      ok: false,
+      response: jsonRequestError(
+        language === "ar"
+          ? "يرجى اختصار السؤال حتى أتمكن من مساعدتك بسرعة."
+          : "Please shorten the question so I can help quickly.",
+        language
+      ),
+    };
+  }
+
+  return { ok: true, question, language };
 }
 
 function safeMockAnswer(
@@ -112,21 +185,21 @@ export async function POST(request: Request) {
   let knowledge: ActiveEventKnowledge | null = null;
 
   try {
-    const body = await request.json();
-    question = String(body.question || "").trim();
-    language = body.language === "ar" ? "ar" : "en";
-    language = resolveLanguage(question, language);
+    const originGuard = enforceSameOrigin(request);
+    if (originGuard) return originGuard;
 
-    if (!question) {
-      return Response.json(
-        {
-          answer: language === "ar"
-            ? "يرجى طرح سؤال عن الفعالية."
-            : "Please ask a question about the event.",
-        },
-        { status: 400 }
-      );
-    }
+    const rateLimit = checkRateLimit(request, {
+      key: "ask",
+      limit: 10,
+      windowMs: 60_000,
+    });
+    if (rateLimit) return rateLimit;
+
+    const parsed = await parseAskRequest(request);
+    if (!parsed.ok) return parsed.response;
+
+    question = parsed.question;
+    language = parsed.language;
 
     knowledge = loadActiveEventKnowledge();
 

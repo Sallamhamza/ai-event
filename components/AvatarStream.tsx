@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import HologramAvatar from "./HologramAvatar";
 import { detectLanguageFromText, type ConciergeLanguage } from "@/lib/language";
+import { speakWithBrowserSpeech, stopBrowserSpeech } from "@/lib/browser-speech";
 
 // ── Public types ─────────────────────────────────────────────────────────────
 export type AvatarState = "loading" | "ready" | "speaking" | "stopped" | "error";
@@ -29,63 +30,7 @@ interface AvatarStreamProps {
   enabled?: boolean;
 }
 
-const AGENT_PORTRAIT = "/male-avatar-hologram.png";
-let voiceCache: SpeechSynthesisVoice[] = [];
-
-function getBrowserVoices(): SpeechSynthesisVoice[] {
-  if (voiceCache.length) return voiceCache;
-  voiceCache = window.speechSynthesis?.getVoices() ?? [];
-  return voiceCache;
-}
-
-if (typeof window !== "undefined" && window.speechSynthesis) {
-  const refreshVoices = () => {
-    voiceCache = window.speechSynthesis.getVoices();
-  };
-  refreshVoices();
-  window.speechSynthesis.addEventListener("voiceschanged", refreshVoices);
-}
-
-// ── Browser TTS — male English / native Arabic ───────────────────────────────
-// Strategy for male English: filter OUT known female voices (works on iOS/Android/Windows)
-// because mobile browsers rarely label voices as "male" by name.
-const FEMALE_VOICE_PATTERN = /female|woman|samantha|victoria|karen|zira|hazel|emma|siri|fiona|moira|tessa|allison|ava|susan|kate|linda|alice|amelie|anna|joana|laura|lekha|luciana|mariska|mei|monica|nora|paulina|satu|sin-ji|soledad|ting-ting|veena|yuna/i;
-
-function browserSpeak(text: string, lang: ConciergeLanguage = "en"): Promise<void> {
-  return new Promise((resolve) => {
-    window.speechSynthesis?.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    const voices = getBrowserVoices();
-    const speechLang = detectLanguageFromText(text, lang);
-
-    if (speechLang === "ar") {
-      utter.lang  = "ar-SA";
-      utter.rate  = 0.88;
-      utter.pitch = 1.0;
-      const arVoice =
-        voices.find(v => v.lang === "ar-SA") ??
-        voices.find(v => v.lang.startsWith("ar"));
-      if (arVoice) utter.voice = arVoice;
-    } else {
-      utter.lang  = "en-US";
-      utter.rate  = 0.92;
-      utter.pitch = 0.82; // low pitch = masculine sound on any voice
-      // 1) Explicit male label (Windows/Android/some macOS)
-      const maleVoice =
-        voices.find(v => v.lang.startsWith("en") && /\bmale\b/i.test(v.name)) ??
-        // 2) Common male voice names across platforms
-        voices.find(v => v.lang.startsWith("en") && /\b(david|mark|daniel|james|george|ryan|richard|alex|fred|guy|tom|oliver|rishi|aaron|arthur|thomas)\b/i.test(v.name)) ??
-        // 3) Any English voice that is NOT a known female voice (safest for iOS)
-        voices.find(v => v.lang.startsWith("en-US") && !FEMALE_VOICE_PATTERN.test(v.name)) ??
-        voices.find(v => v.lang.startsWith("en")    && !FEMALE_VOICE_PATTERN.test(v.name));
-      if (maleVoice) utter.voice = maleVoice;
-    }
-
-    utter.onend  = () => resolve();
-    utter.onerror= () => resolve();
-    window.speechSynthesis?.speak(utter);
-  });
-}
+const AGENT_PORTRAIT = "/male-avatar-hologram.webp";
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AvatarStream({
@@ -160,11 +105,11 @@ export default function AvatarStream({
     if (videoRef.current) videoRef.current.muted = true;
     const spoken = await playGeneratedSpeech(text, speechLang);
     if (spoken) return;
-    await browserSpeak(text, speechLang);
+    await speakWithBrowserSpeech(text, speechLang);
   }, [playGeneratedSpeech]);
 
   const didStop = useCallback(async () => {
-    window.speechSynthesis?.cancel();
+    stopBrowserSpeech();
     stopGeneratedAudio();
     if (!streamIdRef.current) return;
     await fetch("/api/did-stream/close", {
