@@ -13,6 +13,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import HologramAvatar from "./HologramAvatar";
 import { detectLanguageFromText, type ConciergeLanguage } from "@/lib/language";
 import { speakWithBrowserSpeech, stopBrowserSpeech } from "@/lib/browser-speech";
+import styles from "./AvatarStream.module.css";
 
 // ── Public types ─────────────────────────────────────────────────────────────
 export type AvatarState = "loading" | "ready" | "speaking" | "stopped" | "error";
@@ -45,6 +46,13 @@ export default function AvatarStream({
   const streamIdRef  = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const generatedAudioRef = useRef<HTMLAudioElement | null>(null);
+  const callbacksRef = useRef<{
+    didSpeak: DIDAvatar["speak"];
+    didStop: DIDAvatar["stop"];
+    onAvatarReady: AvatarStreamProps["onAvatarReady"];
+    onAvatarError: AvatarStreamProps["onAvatarError"];
+    updateState: (state: AvatarState) => void;
+  } | null>(null);
 
   const [isConnecting, setIsConnecting] = useState(enabled);
 
@@ -119,6 +127,16 @@ export default function AvatarStream({
     }).catch(() => {});
   }, [stopGeneratedAudio]);
 
+  useEffect(() => {
+    callbacksRef.current = {
+      didSpeak,
+      didStop,
+      onAvatarReady,
+      onAvatarError,
+      updateState,
+    };
+  }, [didSpeak, didStop, onAvatarReady, onAvatarError, updateState]);
+
   // ── WebRTC session lifecycle ─────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
@@ -147,8 +165,9 @@ export default function AvatarStream({
     function signalReady() {
       if (!mounted) return;
       setIsConnecting(false);
-      updateState("ready");
-      onAvatarReady({ speak: didSpeak, stop: didStop },
+      const callbacks = callbacksRef.current;
+      callbacks?.updateState("ready");
+      callbacks?.onAvatarReady({ speak: callbacks.didSpeak, stop: callbacks.didStop },
         streamIdRef.current  ?? undefined,
         sessionIdRef.current ?? undefined);
     }
@@ -161,7 +180,7 @@ export default function AvatarStream({
         const session = await res.json();
         const offer = session.offer ?? session.jsep;
         if (!res.ok || !session.id || !offer) {
-          onAvatarError?.(session?.error ?? "D-ID stream unavailable");
+          callbacksRef.current?.onAvatarError?.(session?.error ?? "D-ID stream unavailable");
           signalReady();
           return;
         } // portrait+TTS
@@ -241,7 +260,7 @@ export default function AvatarStream({
         }, 25_000);
 
       } catch {
-        onAvatarError?.("D-ID stream unavailable");
+        callbacksRef.current?.onAvatarError?.("D-ID stream unavailable");
         if (mounted) signalReady(); // portrait + TTS
       }
     }
@@ -260,7 +279,7 @@ export default function AvatarStream({
       stopTimer = setTimeout(() => {
         if (!mounted) return;
         setIsConnecting(false);
-        updateState("stopped");
+        callbacksRef.current?.updateState("stopped");
       }, 0);
     }
 
@@ -271,13 +290,11 @@ export default function AvatarStream({
       window.removeEventListener("beforeunload", onUnload);
       closeSession();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%",
-                  display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div className={styles.frame}>
 
       {/* The premium hologram UI — owns the <video> element via videoRef */}
       <HologramAvatar

@@ -18,10 +18,37 @@ interface RateBucket {
   resetAt: number;
 }
 
+const MAX_RATE_BUCKETS = 5_000;
+const RATE_BUCKET_PRUNE_INTERVAL_MS = 60_000;
+
 const rateBuckets = new Map<string, RateBucket>();
+let lastRateBucketPruneAt = 0;
 
 function jsonError(message: string, status: number, headers?: HeadersInit): Response {
   return Response.json({ error: message }, { status, headers });
+}
+
+function pruneExpiredRateBuckets(now: number): void {
+  if (
+    rateBuckets.size < MAX_RATE_BUCKETS &&
+    now - lastRateBucketPruneAt < RATE_BUCKET_PRUNE_INTERVAL_MS
+  ) {
+    return;
+  }
+
+  lastRateBucketPruneAt = now;
+  for (const [clientKey, bucket] of rateBuckets) {
+    if (bucket.resetAt <= now) {
+      rateBuckets.delete(clientKey);
+    }
+  }
+}
+
+function evictOldestRateBucket(): void {
+  const oldestClientKey = rateBuckets.keys().next().value;
+  if (oldestClientKey) {
+    rateBuckets.delete(oldestClientKey);
+  }
 }
 
 export function getClientIp(request: Request): string {
@@ -41,14 +68,25 @@ export function checkRateLimit(
 ): Response | null {
   const now = Date.now();
   const clientKey = `${key}:${getClientIp(request)}`;
+  pruneExpiredRateBuckets(now);
+
   const bucket = rateBuckets.get(clientKey);
 
   if (!bucket || bucket.resetAt <= now) {
+    if (bucket) {
+      rateBuckets.delete(clientKey);
+    } else if (rateBuckets.size >= MAX_RATE_BUCKETS) {
+      evictOldestRateBucket();
+    }
+
     rateBuckets.set(clientKey, { count: 1, resetAt: now + windowMs });
     return null;
   }
 
   bucket.count += 1;
+  rateBuckets.delete(clientKey);
+  rateBuckets.set(clientKey, bucket);
+
   if (bucket.count <= limit) return null;
 
   const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));

@@ -1,0 +1,42 @@
+.body {
+  min-height: 100svh;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  color: #eaf8ff;
+  background: linear-gradient(180deg, #06172b 0%, #020814 100%);
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.panel {
+  width: min(92vw, 460px);
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid rgba(93, 220, 255, 0.26);
+  border-radius: 8px;
+  background: rgba(4, 24, 45, 0.78);
+  text-align: center;
+}
+
+.panel h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.panel p {
+  margin: 0;
+  color: rgba(191, 225, 238, 0.72);
+  line-height: 1.5;
+}
+
+.panel button {
+  min-height: 44px;
+  border: 1px solid rgba(93, 220, 255, 0.42);
+  border-radius: 8px;
+  color: #7defff;
+  background: rgba(4, 26, 48, 0.88);
+  font-weight: 700;
+  cursor: pointer;
+}

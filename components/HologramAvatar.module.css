@@ -1,0 +1,336 @@
+.avatar {
+  --cyan: 0, 218, 255;
+  --blue: 20, 84, 255;
+  position: relative;
+  width: clamp(282px, 62vw, 408px);
+  height: clamp(282px, 62vw, 408px);
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.avatar::before,
+.avatar::after {
+  content: "";
+  position: absolute;
+  inset: 7%;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.avatar::before {
+  background:
+    radial-gradient(circle at center, rgba(var(--cyan), 0.08), transparent 58%),
+    repeating-radial-gradient(circle at center, rgba(var(--cyan), 0.16) 0 1px, transparent 1px 32px);
+  filter: drop-shadow(0 0 20px rgba(var(--cyan), 0.18));
+  animation: avatar-spin 32s linear infinite;
+  z-index: 0;
+}
+
+.avatar::after {
+  inset: 12%;
+  border: 1px solid rgba(var(--cyan), 0.18);
+  box-shadow:
+    inset 0 0 28px rgba(var(--cyan), 0.08),
+    0 0 42px rgba(var(--cyan), 0.08);
+  animation: avatar-breathe 5.2s ease-in-out infinite;
+  z-index: 0;
+}
+
+.halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    conic-gradient(from 30deg, transparent 0 12%, rgba(var(--cyan), 0.26) 13% 15%, transparent 16% 35%, rgba(var(--cyan), 0.14) 36% 38%, transparent 39% 100%),
+    radial-gradient(circle, transparent 51%, rgba(var(--cyan), 0.11) 52%, transparent 67%);
+  mask-image: radial-gradient(circle, transparent 36%, #000 37% 73%, transparent 74%);
+  opacity: 0.72;
+  animation: avatar-spin 42s linear infinite reverse;
+  z-index: 1;
+}
+
+.core {
+  position: relative;
+  width: 78%;
+  height: 78%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(var(--cyan), 0.2);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(var(--cyan), 0.14), transparent 44%),
+    radial-gradient(circle at 50% 65%, rgba(10, 48, 87, 0.72), rgba(1, 10, 21, 0.92) 66%);
+  box-shadow:
+    inset 0 0 34px rgba(var(--cyan), 0.08),
+    0 0 46px rgba(var(--cyan), 0.12);
+  z-index: 3;
+}
+
+.core::before {
+  content: "";
+  position: absolute;
+  inset: 9%;
+  border: 1px solid rgba(var(--cyan), 0.12);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.core::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 7;
+  background:
+    radial-gradient(ellipse 44% 32% at 50% 38%, rgba(var(--cyan), 0.12) 0%, rgba(var(--cyan), 0.08) 42%, transparent 70%),
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.055), transparent 48%),
+    linear-gradient(180deg, rgba(1, 9, 18, 0.02), rgba(1, 9, 18, 0.2));
+  backdrop-filter: blur(0.45px);
+}
+
+.figure {
+  position: relative;
+  width: 91%;
+  height: 108%;
+  overflow: hidden;
+  z-index: 2;
+  filter:
+    drop-shadow(0 0 14px rgba(var(--cyan), 0.28))
+    drop-shadow(0 0 36px rgba(var(--blue), 0.16));
+  animation: avatar-float 6.2s ease-in-out infinite;
+  mask-image:
+    radial-gradient(ellipse 78% 89% at 50% 36%, #000 0 67%, rgba(0, 0, 0, 0.68) 80%, transparent 100%),
+    linear-gradient(180deg, #000 0 76%, transparent 100%);
+  mask-composite: intersect;
+}
+
+.media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 44%;
+  transform: scale(1.05);
+  filter: blur(0.8px) brightness(0.92) saturate(1.06) contrast(0.86);
+  opacity: 0.82;
+  mix-blend-mode: screen;
+}
+
+.fallback {
+  display: block;
+  opacity: 0.82;
+  animation: avatar-idle 4.2s ease-in-out infinite;
+}
+
+.fallbackSpeaking {
+  animation: avatar-speak 0.66s ease-in-out infinite;
+}
+
+.video {
+  display: none;
+  opacity: 0.82;
+}
+
+.videoVisible {
+  display: block;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.scan {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 5px, rgba(var(--cyan), 0.045) 5px 6px),
+    linear-gradient(180deg, transparent, rgba(var(--cyan), 0.1), transparent);
+  background-size: auto, 100% 46%;
+  animation: avatar-scan 4.8s linear infinite;
+  mix-blend-mode: screen;
+}
+
+.glow {
+  background:
+    radial-gradient(ellipse at 50% 24%, rgba(255, 255, 255, 0.18), transparent 12%),
+    radial-gradient(ellipse at 50% 42%, rgba(var(--cyan), 0.12), transparent 42%),
+    linear-gradient(180deg, transparent 62%, rgba(2, 12, 30, 0.9) 100%);
+}
+
+.equalizer {
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  bottom: 7%;
+  height: 24px;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  gap: 3px;
+  opacity: 0.18;
+  z-index: 6;
+}
+
+.equalizerActive {
+  opacity: 0.82;
+}
+
+.bar {
+  width: 2px;
+  height: 7px;
+  border-radius: 99px;
+  background: rgba(var(--cyan), 0.64);
+  box-shadow: 0 0 7px rgba(var(--cyan), 0.35);
+  animation: avatar-wave 0.86s ease-in-out infinite;
+}
+
+.bar:nth-child(2n) {
+  animation-delay: 0.08s;
+  background: rgba(38, 246, 255, 0.72);
+}
+
+.bar:nth-child(3n) {
+  animation-delay: 0.16s;
+  height: 14px;
+}
+
+.delay0 {
+  animation-delay: 0s;
+}
+
+.delay1 {
+  animation-delay: 0.045s;
+}
+
+.delay2 {
+  animation-delay: 0.09s;
+}
+
+.delay3 {
+  animation-delay: 0.135s;
+}
+
+.delay4 {
+  animation-delay: 0.18s;
+}
+
+.delay5 {
+  animation-delay: 0.225s;
+}
+
+.delay6 {
+  animation-delay: 0.27s;
+}
+
+.delay7 {
+  animation-delay: 0.315s;
+}
+
+.delay8 {
+  animation-delay: 0.36s;
+}
+
+.state {
+  display: none;
+}
+
+.stateDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #00d8ff;
+  box-shadow: 0 0 11px currentColor;
+}
+
+.stateDotLive {
+  background: #15f5a4;
+}
+
+.stateDotFallback {
+  background: #35d9ff;
+}
+
+@keyframes avatar-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes avatar-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.72;
+  }
+  50% {
+    transform: scale(1.045);
+    opacity: 1;
+  }
+}
+
+@keyframes avatar-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -8px;
+  }
+}
+
+@keyframes avatar-idle {
+  0%,
+  100% {
+    transform: scale(1.05);
+    filter: blur(0.8px) brightness(0.92) saturate(1.06) contrast(0.86);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.072);
+    filter: blur(1px) brightness(0.98) saturate(1.1) contrast(0.84);
+    opacity: 0.86;
+  }
+}
+
+@keyframes avatar-speak {
+  0%,
+  100% {
+    transform: scale(1.055);
+    filter: blur(0.75px) brightness(1) saturate(1.12) contrast(0.88);
+    opacity: 0.86;
+  }
+  45% {
+    transform: scale(1.085);
+    filter: blur(0.95px) brightness(1.08) saturate(1.18) contrast(0.86);
+    opacity: 0.9;
+  }
+}
+
+@keyframes avatar-scan {
+  from {
+    background-position: 0 0, 0 -120%;
+  }
+  to {
+    background-position: 0 0, 0 180%;
+  }
+}
+
+@keyframes avatar-wave {
+  0%,
+  100% {
+    height: 6px;
+    opacity: 0.34;
+  }
+  50% {
+    height: 21px;
+    opacity: 1;
+  }
+}

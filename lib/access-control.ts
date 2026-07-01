@@ -1,3 +1,6 @@
+import { Buffer } from "node:buffer";
+import { timingSafeEqual } from "node:crypto";
+
 export const ACCESS_COOKIE_NAME = "aivent_demo_access";
 export const ACCESS_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 12;
 
@@ -5,6 +8,16 @@ const ACCESS_TOKEN_MESSAGE = "aivent-demo-access-v1";
 
 function getAccessPassword(): string {
   return process.env.DEMO_ACCESS_PASSWORD?.trim() || "";
+}
+
+function timingSafeStringEqual(actual: string, expected: string): boolean {
+  if (actual.length !== expected.length) return false;
+
+  const actualBytes = Buffer.from(actual, "utf8");
+  const expectedBytes = Buffer.from(expected, "utf8");
+
+  if (actualBytes.byteLength !== expectedBytes.byteLength) return false;
+  return timingSafeEqual(actualBytes, expectedBytes);
 }
 
 function bytesToHex(buffer: ArrayBuffer): string {
@@ -37,11 +50,8 @@ export function isAccessGateEnabled(): boolean {
 
 export function isCorrectAccessPassword(password: unknown): boolean {
   const configuredPassword = getAccessPassword();
-  return (
-    Boolean(configuredPassword) &&
-    typeof password === "string" &&
-    password === configuredPassword
-  );
+  if (!configuredPassword || typeof password !== "string") return false;
+  return timingSafeStringEqual(password, configuredPassword);
 }
 
 export async function createAccessCookieValue(): Promise<string> {
@@ -55,7 +65,7 @@ export async function isValidAccessCookie(value: string | undefined | null): Pro
   if (!value) return false;
 
   const expectedValue = await createAccessCookieValue();
-  return value === expectedValue;
+  return timingSafeStringEqual(value, expectedValue);
 }
 
 export function buildAccessCookieHeader(value: string, secure: boolean): string {

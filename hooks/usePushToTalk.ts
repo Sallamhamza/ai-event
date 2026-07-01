@@ -9,10 +9,10 @@
 // 3. API receives the detected language and responds in that language
 // 4. TTS speaks the answer in the detected language with appropriate voice
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import type { DIDAvatar } from "@/components/AvatarStream";
 import { detectLanguageFromText, detectSpokenLanguage, type ConciergeLanguage } from "@/lib/language";
-import { speakWithBrowserSpeech } from "@/lib/browser-speech";
+import { speakWithBrowserSpeech, stopBrowserSpeech } from "@/lib/browser-speech";
 
 // ── Exports ─────────────────────────────────────────────────────────────────
 export type PTTStatus = "idle" | "listening" | "thinking" | "speaking" | "error";
@@ -26,6 +26,44 @@ interface UsePushToTalkOptions {
   onTranscript?: (text: string) => void;
   onAnswer?:     (text: string) => void;
   onLanguageDetected?: (lang: ConciergeLanguage) => void;
+}
+
+function getMicrophoneErrorMessage(error: string, language: ConciergeLanguage): string {
+  if (language === "ar") {
+    if (error === "not-allowed" || error === "service-not-allowed") {
+      return "يرجى السماح باستخدام الميكروفون ثم المحاولة مرة أخرى.";
+    }
+    if (error === "audio-capture") {
+      return "لم أتمكن من الوصول إلى الميكروفون. يرجى التحقق من توصيله.";
+    }
+    if (error === "network") {
+      return "انقطع الاتصال بخدمة التعرف على الصوت. يرجى المحاولة مرة أخرى.";
+    }
+    return "حدثت مشكلة في الميكروفون. يرجى المحاولة مرة أخرى.";
+  }
+
+  if (error === "not-allowed" || error === "service-not-allowed") {
+    return "Please allow microphone access, then try again.";
+  }
+  if (error === "audio-capture") {
+    return "I could not reach the microphone. Please check that it is connected.";
+  }
+  if (error === "network") {
+    return "Speech recognition lost its connection. Please try again.";
+  }
+  return "The microphone had a temporary issue. Please try again.";
+}
+
+function getRequestErrorMessage(status: number, language: ConciergeLanguage): string {
+  if (language === "ar") {
+    if (status === 401) return "انتهت صلاحية الوصول إلى العرض. يرجى تسجيل الدخول مرة أخرى.";
+    if (status === 429) return "هناك عدد كبير من الطلبات الآن. يرجى الانتظار لحظة ثم المحاولة.";
+    return "تعذر إرسال السؤال الآن. يرجى المحاولة مرة أخرى.";
+  }
+
+  if (status === 401) return "Demo access has expired. Please sign in again.";
+  if (status === 429) return "Too many requests right now. Please wait a moment and try again.";
+  return "I could not send the question right now. Please try again.";
 }
 
 export function usePushToTalk({
@@ -43,8 +81,19 @@ export function usePushToTalk({
 
   const recognitionRef     = useRef<SpeechRecognition | null>(null);
   const finalTranscriptRef = useRef("");
+  const liveTranscriptRef = useRef("");
   const confidenceSamplesRef = useRef<number[]>([]);
   const listeningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const askAbortRef = useRef<AbortController | null>(null);
+  const sessionVersionRef = useRef(0);
+  const mountedRef = useRef(true);
+  const avatarRef = useRef<DIDAvatar | null | undefined>(avatar);
+  const callbacksRef = useRef({ onTranscript, onAnswer, onLanguageDetected });
+
+  useEffect(() => {
+    avatarRef.current = avatar;
+    callbacksRef.current = { onTranscript, onAnswer, onLanguageDetected };
+  }, [avatar, onTranscript, onAnswer, onLanguageDetected]);
 
   const clearListeningTimer = useCallback(() => {
     if (!listeningTimerRef.current) return;
@@ -52,9 +101,29 @@ export function usePushToTalk({
     listeningTimerRef.current = null;
   }, []);
 
+  const cancelInFlightWork = useCallback(() => {
+    sessionVersionRef.current += 1;
+    askAbortRef.current?.abort();
+    askAbortRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      cancelInFlightWork();
+      recognitionRef.current?.stop();
+      recognitionRef.current = null;
+      clearListeningTimer();
+      stopBrowserSpeech();
+      void avatarRef.current?.stop();
+    };
+  }, [cancelInFlightWork, clearListeningTimer]);
+
   // ── Start recording ─────────────────────────────────────────────────────
   const startListening = useCallback(() => {
     if (status !== "idle") return;
+    cancelInFlightWork();
 
     const SpeechRecognitionAPI =
       (window as unknown as { SpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition ??
@@ -78,6 +147,7 @@ export function usePushToTalk({
     recognition.maxAlternatives = 1;
 
     finalTranscriptRef.current = "";
+    liveTranscriptRef.current = "";
     confidenceSamplesRef.current = [];
     setLiveTranscript("");
     setError(null);
@@ -105,14 +175,15 @@ export function usePushToTalk({
         }
       }
       finalTranscriptRef.current += final;
-      setLiveTranscript(finalTranscriptRef.current + interim);
+      liveTranscriptRef.current = finalTranscriptRef.current + interim;
+      setLiveTranscript(liveTranscriptRef.current);
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === "no-speech") return;
       clearListeningTimer();
       recognitionRef.current = null;
-      setError(`Microphone error: ${event.error}`);
+      setError(getMicrophoneErrorMessage(event.error, language));
       setStatus("error");
     };
 
@@ -124,8 +195,10 @@ export function usePushToTalk({
     recognition.start();
 
     listeningTimerRef.current = setTimeout(() => {
+      sessionVersionRef.current += 1;
       recognition.stop();
       recognitionRef.current = null;
+      liveTranscriptRef.current = "";
       setLiveTranscript("");
       setError(
         language === "ar"
@@ -134,7 +207,7 @@ export function usePushToTalk({
       );
       setStatus("error");
     }, MAX_LISTENING_MS);
-  }, [clearListeningTimer, status, language]);
+  }, [cancelInFlightWork, clearListeningTimer, status, language]);
 
   // ── Stop recording → detect language → ask API → speak answer ──────────
   const stopListening = useCallback(async () => {
@@ -144,9 +217,10 @@ export function usePushToTalk({
     recognitionRef.current = null;
     clearListeningTimer();
 
-    const transcript = (finalTranscriptRef.current || liveTranscript).trim();
+    const transcript = (finalTranscriptRef.current || liveTranscriptRef.current).trim();
     if (!transcript) {
       setStatus("idle");
+      liveTranscriptRef.current = "";
       setLiveTranscript("");
       return;
     }
@@ -168,22 +242,44 @@ export function usePushToTalk({
       return;
     }
 
-    onTranscript?.(transcript);
+    callbacksRef.current.onTranscript?.(transcript);
     setStatus("thinking");
 
     // Detect language from what the user actually said. If Arabic recognition
     // was selected but Chrome returns Latin text, keep Arabic as the language.
     const lang = detectSpokenLanguage(transcript, language);
-    onLanguageDetected?.(lang);
+    callbacksRef.current.onLanguageDetected?.(lang);
+
+    let controller: AbortController | null = null;
 
     try {
+      const runVersion = sessionVersionRef.current;
+      controller = new AbortController();
+      askAbortRef.current?.abort();
+      askAbortRef.current = controller;
+      const isCurrentRun = () =>
+        mountedRef.current &&
+        sessionVersionRef.current === runVersion &&
+        controller !== null &&
+        !controller.signal.aborted;
       const requestStartedAt = performance.now();
       const res = await fetch("/api/ask", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ question: transcript, language: lang }),
+        signal: controller.signal,
       });
+      if (!isCurrentRun()) return;
+
       const data   = await res.json();
+      if (!res.ok) {
+        setError(getRequestErrorMessage(res.status, lang));
+        setStatus("error");
+        liveTranscriptRef.current = "";
+        setLiveTranscript("");
+        return;
+      }
+
       setResponseTimeMs(Math.round(performance.now() - requestStartedAt));
       const answer = data.answer ?? (
         lang === "ar"
@@ -193,44 +289,62 @@ export function usePushToTalk({
 
       // Double-check: if the API returned Arabic text, speak in Arabic
       const answerLang = detectLanguageFromText(answer, lang);
-      onLanguageDetected?.(answerLang);
-      onAnswer?.(answer);
+      callbacksRef.current.onLanguageDetected?.(answerLang);
+      callbacksRef.current.onAnswer?.(answer);
 
       setStatus("speaking");
 
       // Speak the answer
-      if (avatar) {
+      const activeAvatar = avatarRef.current;
+      if (activeAvatar) {
         try {
-          await avatar.speak(answer, answerLang);
+          await activeAvatar.speak(answer, answerLang);
         } catch {
+          if (!isCurrentRun()) return;
           await speakWithBrowserSpeech(answer, answerLang);
         }
       } else {
         await speakWithBrowserSpeech(answer, answerLang);
       }
 
+      if (!isCurrentRun()) return;
       setStatus("idle");
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       console.error("Concierge error:", err);
-      setError("Something went wrong. Please try again.");
+      setError(
+        language === "ar"
+          ? "حدث خلل مؤقت. يرجى المحاولة مرة أخرى."
+          : "Something went wrong for a moment. Please try again."
+      );
       setStatus("error");
+    } finally {
+      if (askAbortRef.current === controller) {
+        askAbortRef.current = null;
+      }
     }
 
+    liveTranscriptRef.current = "";
     setLiveTranscript("");
-  }, [clearListeningTimer, status, liveTranscript, avatar, language, onTranscript, onAnswer, onLanguageDetected]);
+  }, [clearListeningTimer, status, language]);
 
   // ── Reset ───────────────────────────────────────────────────────────────
   const reset = useCallback(() => {
+    cancelInFlightWork();
     recognitionRef.current?.stop();
     recognitionRef.current = null;
     clearListeningTimer();
+    stopBrowserSpeech();
+    void avatarRef.current?.stop();
+    finalTranscriptRef.current = "";
+    liveTranscriptRef.current = "";
     confidenceSamplesRef.current = [];
     setStatus("idle");
     setLiveTranscript("");
     setError(null);
     setResponseTimeMs(null);
     setSpeechConfidence(null);
-  }, [clearListeningTimer]);
+  }, [cancelInFlightWork, clearListeningTimer]);
 
   return {
     status,

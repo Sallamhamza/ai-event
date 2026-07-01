@@ -88,6 +88,61 @@
   margin-bottom: 4px;
 }
 
+.settingsPanel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(100%, 300px);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(93, 220, 255, 0.28);
+  border-radius: 8px;
+  background: rgba(2, 14, 30, 0.96);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+}
+
+.settingsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settingsRow strong {
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 750;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.settingsActions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settingsActions button,
+.settingsActions a {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid rgba(93, 220, 255, 0.26);
+  border-radius: 8px;
+  color: rgba(218, 250, 255, 0.9);
+  background: rgba(5, 34, 61, 0.82);
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .livePill {
   display: inline-flex;
   align-items: center;
@@ -257,11 +312,20 @@
   grid-area: conversation;
   z-index: 8;
   width: min(100%, 430px);
+  min-height: 168px;
+  margin-top: 18px;
+  flex-shrink: 0;
+}
+
+.conversationLog {
+  max-height: min(31svh, 280px);
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 18px;
-  flex-shrink: 0;
+  overflow: hidden auto;
+  padding: 2px 4px 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(93, 220, 255, 0.38) transparent;
 }
 
 .bubble {
@@ -286,6 +350,10 @@
   width: min(94%, 390px);
   border-color: rgba(93, 220, 255, 0.32);
   background: rgba(4, 31, 59, 0.82);
+}
+
+.bubbleDraft {
+  opacity: 0.78;
 }
 
 .bubbleLabel {
@@ -425,12 +493,60 @@
   animation: signal 1.05s ease-in-out infinite;
 }
 
+.signalDelay0 {
+  animation-delay: 0s;
+}
+
+.signalDelay1 {
+  animation-delay: 0.035s;
+}
+
+.signalDelay2 {
+  animation-delay: 0.07s;
+}
+
+.signalDelay3 {
+  animation-delay: 0.105s;
+}
+
+.signalDelay4 {
+  animation-delay: 0.14s;
+}
+
+.signalDelay5 {
+  animation-delay: 0.175s;
+}
+
+.signalDelay6 {
+  animation-delay: 0.21s;
+}
+
+.signalDelay7 {
+  animation-delay: 0.245s;
+}
+
+.signalDelay8 {
+  animation-delay: 0.28s;
+}
+
+.signalDelay9 {
+  animation-delay: 0.315s;
+}
+
+.signalDelay10 {
+  animation-delay: 0.35s;
+}
+
+.signalDelay11 {
+  animation-delay: 0.385s;
+}
+
 .errorBanner {
-  position: absolute;
+  position: relative;
   z-index: 30;
-  left: 18px;
-  right: 18px;
-  bottom: 18px;
+  width: min(100%, 520px);
+  grid-column: 1 / -1;
+  margin-top: 10px;
   padding: 11px 14px;
   border: 1px solid rgba(255, 91, 91, 0.32);
   border-radius: 14px;
@@ -551,6 +667,10 @@
     align-self: center;
   }
 
+  .conversationLog {
+    max-height: min(48svh, 380px);
+  }
+
   .statusSection {
     min-height: 138px;
   }
@@ -603,6 +723,11 @@
     gap: 8px;
   }
 
+  .conversationLog {
+    max-height: min(48svh, 320px);
+    gap: 8px;
+  }
+
   .bubble {
     padding: 11px 13px;
   }
@@ -646,6 +771,11 @@
     gap: 6px;
   }
 
+  .settingsPanel {
+    right: -6px;
+    width: min(calc(100vw - 28px), 300px);
+  }
+
   .langToggle {
     min-width: 82px;
     padding-inline: 10px;
@@ -655,6 +785,14 @@
 
   .avatarZone {
     height: clamp(286px, 39svh, 358px);
+  }
+
+  .conversation {
+    min-height: 150px;
+  }
+
+  .conversationLog {
+    max-height: 24svh;
   }
 
   .statusSection {

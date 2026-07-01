@@ -2,7 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
-const EVENT_PATH = path.join(process.cwd(), "data", "active-event.json");
+const ACTIVE_EVENT_ID = process.env.ACTIVE_EVENT_ID?.trim() || "active-event";
+const EVENT_PATH = ACTIVE_EVENT_ID === "active-event"
+  ? path.join(process.cwd(), "data", "active-event.json")
+  : path.join(process.cwd(), "data", "events", `${ACTIVE_EVENT_ID}.json`);
 const ARABIC_RE = /[\u0600-\u06ff]/;
 const LATIN_RE = /[A-Za-z]/;
 

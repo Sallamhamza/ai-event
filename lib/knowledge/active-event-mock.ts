@@ -138,9 +138,11 @@ interface Candidate {
 
 const ARABIC_RE = /[\u0600-\u06ff]/;
 const KNOWLEDGE_CACHE_TTL_MS = 30_000;
+const DEFAULT_EVENT_ID = "active-event";
 
 let cachedKnowledge: ActiveEventKnowledge | null = null;
 let cachedKnowledgeExpiresAt = 0;
+let cachedKnowledgePath = "";
 
 const EN_STOPWORDS = new Set([
   "the", "and", "for", "with", "what", "where", "when", "how", "can",
@@ -155,15 +157,39 @@ const AR_STOPWORDS = new Set([
 
 export function loadActiveEventKnowledge(): ActiveEventKnowledge {
   const now = Date.now();
-  if (cachedKnowledge && cachedKnowledgeExpiresAt > now) {
+  const filePath = getActiveEventFilePath();
+
+  if (cachedKnowledge && cachedKnowledgePath === filePath && cachedKnowledgeExpiresAt > now) {
     return cachedKnowledge;
   }
 
-  const filePath = path.join(process.cwd(), "data", "active-event.json");
   const raw = fs.readFileSync(filePath, "utf-8");
   cachedKnowledge = JSON.parse(raw) as ActiveEventKnowledge;
   cachedKnowledgeExpiresAt = now + KNOWLEDGE_CACHE_TTL_MS;
+  cachedKnowledgePath = filePath;
   return cachedKnowledge;
+}
+
+export function getActiveEventId(): string {
+  const configured = process.env.ACTIVE_EVENT_ID?.trim();
+  if (!configured) return DEFAULT_EVENT_ID;
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(configured)) return DEFAULT_EVENT_ID;
+  return configured;
+}
+
+export function getActiveEventFilePath(): string {
+  const eventId = getActiveEventId();
+  if (eventId === DEFAULT_EVENT_ID) {
+    return path.join(process.cwd(), "data", "active-event.json");
+  }
+
+  return path.join(process.cwd(), "data", "events", `${eventId}.json`);
+}
+
+export function clearActiveEventKnowledgeCache(): void {
+  cachedKnowledge = null;
+  cachedKnowledgeExpiresAt = 0;
+  cachedKnowledgePath = "";
 }
 
 export function resolveLanguage(question: string, language: ConciergeLanguage): ConciergeLanguage {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AvatarStream, { type DIDAvatar } from "@/components/AvatarStream";
 import PushToTalkButton from "@/components/PushToTalkButton";
 import { usePushToTalk } from "@/hooks/usePushToTalk";
+import { trackClientEvent } from "@/lib/client-analytics";
 import type { ConciergeLanguage } from "@/lib/language";
 import styles from "./page.module.css";
 
@@ -23,6 +24,31 @@ function formatSpeechConfidence(confidence: number | null, isListening: boolean)
 }
 
 const KIOSK_IDLE_RESET_MS = 60_000;
+const MAX_CONVERSATION_MESSAGES = 16;
+
+interface ConversationMessage {
+  id: string;
+  role: "user" | "aivent";
+  text: string;
+  language: ConciergeLanguage;
+}
+
+function trimConversation(messages: ConversationMessage[]): ConversationMessage[] {
+  return messages.slice(-MAX_CONVERSATION_MESSAGES);
+}
+
+function createMessage(
+  role: ConversationMessage["role"],
+  text: string,
+  language: ConciergeLanguage
+): ConversationMessage {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    role,
+    text,
+    language,
+  };
+}
 
 export default function KioskPage() {
   const [avatar, setAvatar] = useState<DIDAvatar | null>(null);
@@ -31,10 +57,39 @@ export default function KioskPage() {
   const [answer, setAnswer] = useState("");
   const [lang, setLang] = useState<ConciergeLanguage>("en");
   const [isAttractMode, setIsAttractMode] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [conversation, setConversation] = useState<ConversationMessage[]>([]);
 
   const handleAvatarReady = useCallback((av: DIDAvatar, sid?: string) => {
     setAvatar(av);
     if (sid) setStreamId(sid);
+  }, []);
+
+  const handleTranscript = useCallback(
+    (text: string) => {
+      setTranscript(text);
+      setAnswer("");
+      setConversation((current) =>
+        trimConversation([...current, createMessage("user", text, lang)])
+      );
+      trackClientEvent({ event: "question", language: lang });
+    },
+    [lang]
+  );
+
+  const handleAnswer = useCallback(
+    (text: string) => {
+      setAnswer(text);
+      setConversation((current) =>
+        trimConversation([...current, createMessage("aivent", text, lang)])
+      );
+      trackClientEvent({ event: "answer", language: lang });
+    },
+    [lang]
+  );
+
+  const handleLanguageDetected = useCallback((language: ConciergeLanguage) => {
+    setLang(language);
   }, []);
 
   const {
@@ -49,13 +104,36 @@ export default function KioskPage() {
   } = usePushToTalk({
     avatar,
     language: lang,
-    onTranscript: (text) => {
-      setTranscript(text);
-      setAnswer("");
-    },
-    onAnswer: setAnswer,
-    onLanguageDetected: setLang,
+    onTranscript: handleTranscript,
+    onAnswer: handleAnswer,
+    onLanguageDetected: handleLanguageDetected,
   });
+
+  const resetSession = useCallback(() => {
+    reset();
+    setTranscript("");
+    setAnswer("");
+    setConversation([]);
+    setSettingsOpen(false);
+    trackClientEvent({ event: "session_reset", language: lang });
+  }, [lang, reset]);
+
+  const toggleSettings = useCallback(() => {
+    setSettingsOpen((current) => {
+      const next = !current;
+      if (next) trackClientEvent({ event: "settings_open", language: lang });
+      return next;
+    });
+  }, [lang]);
+
+  useEffect(() => {
+    trackClientEvent({ event: "page_view", language: lang });
+  }, [lang]);
+
+  useEffect(() => {
+    if (!error) return;
+    trackClientEvent({ event: "voice_error", language: lang });
+  }, [error, lang]);
 
   useEffect(() => {
     let idleTimer: number | undefined;
@@ -75,6 +153,8 @@ export default function KioskPage() {
       idleTimer = window.setTimeout(() => {
         setTranscript("");
         setAnswer("");
+        setConversation([]);
+        setSettingsOpen(false);
         reset();
         setIsAttractMode(true);
       }, KIOSK_IDLE_RESET_MS);
@@ -124,6 +204,26 @@ export default function KioskPage() {
   const confidence = formatSpeechConfidence(speechConfidence, status === "listening");
   const streamQuality = streamId ? "Live stream" : avatar ? "TTS fallback" : "Pending";
   const languageMode = lang === "ar" ? "Arabic" : "English";
+  const welcomeTitle = lang === "ar" ? (
+    <>
+      مرحبًا، أنا <strong>AIVENT</strong>
+    </>
+  ) : (
+    <>
+      Hello, I&apos;m <strong>AIVENT</strong>
+    </>
+  );
+  const welcomeSubtitle = lang === "ar" ? "مساعدك الذكي للفعالية" : "Your AI Event Concierge";
+  const defaultUserPrompt =
+    lang === "ar" ? "ما هي أبرز مميزات هذه الفعالية؟" : "What are the main highlights of this event?";
+  const renderedConversation = useMemo<ConversationMessage[]>(() => {
+    if (conversation.length > 0 || liveTranscript) return conversation;
+
+    return [
+      { id: "default-user", role: "user", text: defaultUserPrompt, language: lang },
+      { id: "default-aivent", role: "aivent", text: assistantCopy, language: lang },
+    ];
+  }, [assistantCopy, conversation, defaultUserPrompt, lang, liveTranscript]);
 
   return (
     <main className={cx(styles.page, isAttractMode && styles.pageAttract)}>
@@ -163,10 +263,36 @@ export default function KioskPage() {
                 className={cx(styles.iconButton, styles.settingsButton)}
                 type="button"
                 aria-label="Settings"
+                aria-expanded={settingsOpen}
+                onClick={toggleSettings}
               >
                 <span />
               </button>
             </div>
+
+            {settingsOpen && (
+              <div className={styles.settingsPanel} role="dialog" aria-label="Kiosk settings">
+                <div className={styles.settingsRow}>
+                  <span>Language</span>
+                  <strong>{languageMode}</strong>
+                </div>
+                <div className={styles.settingsRow}>
+                  <span>Voice</span>
+                  <strong>OpenAI + Browser</strong>
+                </div>
+                <div className={styles.settingsRow}>
+                  <span>Offline</span>
+                  <strong>Ready</strong>
+                </div>
+                <div className={styles.settingsActions}>
+                  <button type="button" onClick={resetSession}>
+                    Reset
+                  </button>
+                  <a href="/admin/analytics">Analytics</a>
+                  <a href="/admin/event">Event</a>
+                </div>
+              </div>
+            )}
           </header>
 
           <div className={styles.avatarZone}>
@@ -174,26 +300,40 @@ export default function KioskPage() {
           </div>
 
           <section className={styles.welcome} aria-label="Welcome">
-            <h1>
-              Hello, I&apos;m <strong>AIVENT</strong>
-            </h1>
-            <p>Your AI Event Concierge</p>
+            <h1>{welcomeTitle}</h1>
+            <p>{welcomeSubtitle}</p>
           </section>
 
           <section className={styles.conversation} aria-live="polite" aria-label="Conversation">
-            <div className={cx(styles.bubble, styles.bubbleUser)}>
-              <span className={styles.bubbleLabel}>{lang === "ar" ? "أنت" : "You"}</span>
-              <p dir={lang === "ar" ? "rtl" : "ltr"}>
-                {displayTranscript ||
-                  (lang === "ar"
-                    ? "ما هي أبرز مميزات هذه الفعالية؟"
-                    : "What are the main highlights of this event?")}
-              </p>
-            </div>
+            <div className={styles.conversationLog}>
+              {renderedConversation.map((message) => (
+                <div
+                  className={cx(
+                    styles.bubble,
+                    message.role === "user" ? styles.bubbleUser : styles.bubbleAivent
+                  )}
+                  key={message.id}
+                >
+                  <span className={styles.bubbleLabel}>
+                    {message.role === "user" ? (message.language === "ar" ? "أنت" : "You") : "Aivent"}
+                  </span>
+                  <p dir={message.language === "ar" ? "rtl" : "ltr"}>{message.text}</p>
+                </div>
+              ))}
 
-            <div className={cx(styles.bubble, styles.bubbleAivent)}>
-              <span className={styles.bubbleLabel}>Aivent</span>
-              <p dir={lang === "ar" ? "rtl" : "ltr"}>{assistantCopy}</p>
+              {liveTranscript && (
+                <div className={cx(styles.bubble, styles.bubbleUser, styles.bubbleDraft)}>
+                  <span className={styles.bubbleLabel}>{lang === "ar" ? "أنت" : "You"}</span>
+                  <p dir={lang === "ar" ? "rtl" : "ltr"}>{displayTranscript}</p>
+                </div>
+              )}
+
+              {status === "thinking" && !answer && (
+                <div className={cx(styles.bubble, styles.bubbleAivent, styles.bubbleDraft)}>
+                  <span className={styles.bubbleLabel}>Aivent</span>
+                  <p dir={lang === "ar" ? "rtl" : "ltr"}>{assistantCopy}</p>
+                </div>
+              )}
             </div>
           </section>
 
@@ -253,7 +393,7 @@ export default function KioskPage() {
             </div>
             <div className={styles.signalLine} aria-hidden>
               {Array.from({ length: 48 }).map((_, index) => (
-                <span key={index} style={{ animationDelay: `${(index % 12) * 0.035}s` }} />
+                <span key={index} className={styles[`signalDelay${index % 12}`]} />
               ))}
             </div>
           </article>
